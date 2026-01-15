@@ -17,7 +17,7 @@ const addSingularizationRules = (
 
 const importPluralize = () => {
   const moduleId = Object.values(require.cache).find((module) => {
-    return module?.path.endsWith('/pluralize');
+    return module?.filename?.includes('pluralize');
   })?.id;
 
   if (moduleId) {
