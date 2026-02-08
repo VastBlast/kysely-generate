@@ -28,7 +28,7 @@ export class MssqlIntrospectorDialect extends IntrospectorDialect {
         ? explicitPort
           ? Number.parseInt(explicitPort, 10)
           : tokens?.[1]
-            ? Number.parseInt(tokens?.[1]!, 10)
+            ? Number.parseInt(tokens?.[1], 10)
             : DEFAULT_MSSQL_PORT
         : undefined;
 
