@@ -63,30 +63,30 @@ export class Cli {
       dialect,
     });
 
-    const output = await generate({
-      camelCase: options.camelCase,
-      customImports: options.customImports,
-      db,
-      defaultSchemas: options.defaultSchemas,
-      dialect,
-      excludePattern: options.excludePattern,
-      includePattern: options.includePattern,
-      logger,
-      outFile: options.outFile,
-      overrides: options.overrides,
-      partitions: options.partitions,
-      print: options.print,
-      runtimeEnums: options.runtimeEnums,
-      serializer: options.serializer,
-      singularize: options.singularize,
-      typeMapping: options.typeMapping,
-      typeOnlyImports: options.typeOnlyImports,
-      verify: options.verify,
-    });
-
-    await db.destroy();
-
-    return output;
+    try {
+      return await generate({
+        camelCase: options.camelCase,
+        customImports: options.customImports,
+        db,
+        defaultSchemas: options.defaultSchemas,
+        dialect,
+        excludePattern: options.excludePattern,
+        includePattern: options.includePattern,
+        logger,
+        outFile: options.outFile,
+        overrides: options.overrides,
+        partitions: options.partitions,
+        print: options.print,
+        runtimeEnums: options.runtimeEnums,
+        serializer: options.serializer,
+        singularize: options.singularize,
+        typeMapping: options.typeMapping,
+        typeOnlyImports: options.typeOnlyImports,
+        verify: options.verify,
+      });
+    } finally {
+      await db.destroy();
+    }
   }
 
   #loadConfig(config?: {
