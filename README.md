@@ -8,6 +8,8 @@
   - Now uses tsdown to build both cjs and esm outputs.
   - Uses oxlint and tsgo
 - Fixed custom import detection for override/type-mapping expressions with generics, unions, and arrays.
+- Improved MSSQL connection string parsing with `@tediousjs/connection-string@^1.0.0` support, including NTLM authentication.
+- Fixed a Windows-specific singularization cache path issue.
 
 # kysely-generate <!-- omit from toc -->
 
@@ -42,7 +44,7 @@ npm install kysely mysql2
 npm install kysely better-sqlite3
 
 # MSSQL
-npm install kysely tedious tarn @tediousjs/connection-string@0.5.0
+npm install kysely tedious tarn @tediousjs/connection-string@^1.0.0
 
 # LibSQL
 npm install @libsql/kysely-libsql
