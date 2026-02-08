@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "kysely-generate",
-  "version": "0.20.2",
+  "version": "0.21.2",
   "author": "VastBlast",
   "license": "MIT",
   "bin": {
