@@ -2,6 +2,7 @@ import { MssqlDialect as KyselyMssqlDialect } from 'kysely';
 import type { CreateKyselyDialectOptions } from '../../dialect';
 import { IntrospectorDialect } from '../../dialect';
 import { MssqlIntrospector } from './mssql-introspector';
+import { parse as parseConnectionString } from '@tediousjs/connection-string';
 
 const DEFAULT_MSSQL_PORT = 1433;
 
@@ -10,37 +11,36 @@ export class MssqlIntrospectorDialect extends IntrospectorDialect {
 
   /**
    * @see https://www.connectionstrings.com/microsoft-data-sqlclient/using-a-non-standard-port/
+   * @internal
    */
-  async #parseConnectionString(connectionString: string) {
-    const { MSSQL_SCHEMA, parse } =
-      await import('@tediousjs/connection-string');
-
-    const schema = parse(connectionString).toSchema(MSSQL_SCHEMA) as Record<
-      string,
-      string | number | boolean
-    >;
-    const dataSource = schema['data source'] as string;
-    const tokens = dataSource.split(',');
-    const serverAndInstance = tokens[0]!.split('\\');
-    const server = serverAndInstance[0]!;
-    const instanceName = serverAndInstance[1];
+  protected async parseConnectionString(connectionString: string) {
+    const parsed = parseConnectionString(connectionString);
+    const tokens = parsed.get('server')!.split(',');
+    const serverAndInstance = tokens![0]!.split('\\');
+    const server = serverAndInstance![0]!;
+    const instanceName = serverAndInstance![1];
 
     // Instance name and port are mutually exclusive.
     // See https://tediousjs.github.io/tedious/api-connection.html#:~:text=options.instanceName.
+    const explicitPort = parsed.get('port');
     const port =
       instanceName === undefined
-        ? tokens[1]
-          ? Number.parseInt(tokens[1], 10)
-          : DEFAULT_MSSQL_PORT
+        ? explicitPort
+          ? Number.parseInt(explicitPort, 10)
+          : tokens?.[1]
+            ? Number.parseInt(tokens?.[1], 10)
+            : DEFAULT_MSSQL_PORT
         : undefined;
 
     return {
-      database: schema['initial catalog'] as string,
+      database: parsed.get('database')!,
       instanceName,
-      password: schema.password as string,
+      password: parsed.get('password')!,
       port,
       server,
-      userName: schema['user id'] as string,
+      userName: parsed.get('user id')!,
+      domain: parsed.get('domain')!,
+      authenticationType: parsed.get('authentication')!
     };
   }
 
@@ -48,8 +48,21 @@ export class MssqlIntrospectorDialect extends IntrospectorDialect {
     const tarn = await import('tarn');
     const tedious = await import('tedious');
 
-    const { database, instanceName, password, port, server, userName } =
-      await this.#parseConnectionString(options.connectionString);
+    const { database, instanceName, password, port, server, userName, domain, authenticationType } =
+      await this.parseConnectionString(options.connectionString);
+
+    const authentication = {
+      options: authenticationType === 'ntlm' ? { password, userName, domain } : { password, userName },
+      type: authenticationType === 'ntlm' ? 'ntlm' as const : 'default' as const,
+    }
+
+    const connectionOptions = {
+      database,
+      encrypt: options.ssl ?? true,
+      instanceName,
+      port,
+      trustServerCertificate: true,
+    }
 
     return new KyselyMssqlDialect({
       tarn: {
@@ -60,17 +73,8 @@ export class MssqlIntrospectorDialect extends IntrospectorDialect {
         ...tedious,
         connectionFactory: () => {
           return new tedious.Connection({
-            authentication: {
-              options: { password, userName },
-              type: 'default',
-            },
-            options: {
-              database,
-              encrypt: options.ssl ?? true,
-              instanceName,
-              port,
-              trustServerCertificate: true,
-            },
+            authentication,
+            options: connectionOptions,
             server,
           });
         },

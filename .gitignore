@@ -5,3 +5,5 @@
 **/*.DS_Store
 **/*.tsbuildinfo
 **/.env
+
+mise.toml
