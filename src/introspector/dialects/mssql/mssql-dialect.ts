@@ -2,18 +2,45 @@ import { MssqlDialect as KyselyMssqlDialect } from 'kysely';
 import type { CreateKyselyDialectOptions } from '../../dialect';
 import { IntrospectorDialect } from '../../dialect';
 import { MssqlIntrospector } from './mssql-introspector';
-import { parse as parseConnectionString } from '@tediousjs/connection-string';
 
 const DEFAULT_MSSQL_PORT = 1433;
 
 export class MssqlIntrospectorDialect extends IntrospectorDialect {
   override readonly introspector = new MssqlIntrospector();
 
+  protected async loadConnectionStringParser() {
+    try {
+      return (await import('@tediousjs/connection-string')).parse;
+    } catch (error) {
+      const code =
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        typeof error.code === 'string'
+          ? error.code
+          : undefined;
+
+      if (
+        (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') &&
+        error instanceof Error &&
+        error.message.includes('@tediousjs/connection-string')
+      ) {
+        throw new Error(
+          "MSSQL support requires the optional peer dependency '@tediousjs/connection-string'. Install it to use the 'mssql' dialect.",
+          { cause: error },
+        );
+      }
+
+      throw error;
+    }
+  }
+
   /**
    * @see https://www.connectionstrings.com/microsoft-data-sqlclient/using-a-non-standard-port/
    * @internal
    */
   protected async parseConnectionString(connectionString: string) {
+    const parseConnectionString = await this.loadConnectionStringParser();
     const parsed = parseConnectionString(connectionString);
     const tokens = parsed.get('server')!.split(',');
     const serverAndInstance = tokens![0]!.split('\\');
