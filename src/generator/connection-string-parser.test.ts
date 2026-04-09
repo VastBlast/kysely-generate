@@ -34,6 +34,24 @@ describe(ConnectionStringParser.name, () => {
           dialect: 'postgres',
         },
       );
+      deepStrictEqual(
+        parser.parse({
+          connectionString: 'PG://username:password@hostname/database',
+        }),
+        {
+          connectionString: 'postgres://username:password@hostname/database',
+          dialect: 'postgres',
+        },
+      );
+      deepStrictEqual(
+        parser.parse({
+          connectionString: 'Postgres://username:password@hostname/database',
+        }),
+        {
+          connectionString: 'Postgres://username:password@hostname/database',
+          dialect: 'postgres',
+        },
+      );
     });
   });
 
@@ -54,6 +72,15 @@ describe(ConnectionStringParser.name, () => {
         }),
         {
           connectionString: 'mysqlx://username:password@hostname/database',
+          dialect: 'mysql',
+        },
+      );
+      deepStrictEqual(
+        parser.parse({
+          connectionString: 'MYSQL://username:password@hostname/database',
+        }),
+        {
+          connectionString: 'MYSQL://username:password@hostname/database',
           dialect: 'mysql',
         },
       );
@@ -100,6 +127,15 @@ describe(ConnectionStringParser.name, () => {
         }),
         {
           connectionString: 'libsql://hostname:port/db',
+          dialect: 'libsql',
+        },
+      );
+      deepStrictEqual(
+        parser.parse({
+          connectionString: 'LIBSQL://hostname:port/db',
+        }),
+        {
+          connectionString: 'LIBSQL://hostname:port/db',
           dialect: 'libsql',
         },
       );

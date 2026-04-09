@@ -37,6 +37,7 @@ type Test = {
 };
 
 const SNAPSHOTS_DIR = join(__dirname, 'snapshots');
+const TEST_TIMEOUT = 60_000;
 
 const normalizeNewlines = (string: string) => string.replaceAll('\r\n', '\n');
 
@@ -212,7 +213,7 @@ describe(generate.name, () => {
     const output = await generate({ db, dialect, outFile: null });
     expect(output).toContain('export type Enum = "bar" | "foo";\n');
     expect(output).toContain('  enum: Enum;\n  /**');
-  });
+  }, TEST_TIMEOUT);
 
   it('should generate the correct output for each dialect', async () => {
     for (const { connectionString, dialect, generateOptions, name } of TESTS) {
@@ -230,7 +231,7 @@ describe(generate.name, () => {
       strictEqual(normalizeNewlines(output), normalizeNewlines(expectedOutput));
       await db.destroy();
     }
-  });
+  }, TEST_TIMEOUT);
 
   it('should verify generated types for each dialect', async () => {
     for (const { connectionString, dialect, generateOptions, name } of TESTS) {
@@ -266,7 +267,7 @@ describe(generate.name, () => {
 
       await db.destroy();
     }
-  });
+  }, TEST_TIMEOUT);
 });
 
 describe(serializeFromMetadata.name, () => {

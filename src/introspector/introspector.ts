@@ -27,18 +27,24 @@ export abstract class Introspector<DB> {
     // Insane solution in lieu of a better one.
     // We'll create a database connection with SSL, and if it complains about SSL, try without it.
     for (const ssl of [true, false]) {
+      let db: Kysely<DB> | undefined;
+
       try {
         const dialect = await options.dialect.createKyselyDialect({
           connectionString: options.connectionString,
           ssl,
         });
 
-        const db = new Kysely<DB>({ dialect });
+        db = new Kysely<DB>({ dialect });
 
         await this.establishDatabaseConnection(db);
 
         return db;
       } catch (error) {
+        try {
+          await db?.destroy();
+        } catch {}
+
         const isSslError =
           error instanceof Error && /\bSSL\b/.test(error.message);
         const isUnexpectedError = !ssl || !isSslError;

@@ -27,22 +27,24 @@ type ParsedConnectionString = {
  */
 export class ConnectionStringParser {
   #inferDialectName(connectionString: string): DialectName {
-    if (connectionString.startsWith('libsql')) {
+    const normalizedConnectionString = connectionString.toLowerCase();
+
+    if (normalizedConnectionString.startsWith('libsql')) {
       return 'libsql';
     }
 
-    if (connectionString.startsWith('mysql')) {
+    if (normalizedConnectionString.startsWith('mysql')) {
       return 'mysql';
     }
 
     if (
-      connectionString.startsWith('postgres') ||
-      connectionString.startsWith('pg')
+      normalizedConnectionString.startsWith('postgres') ||
+      normalizedConnectionString.startsWith('pg')
     ) {
       return 'postgres';
     }
 
-    if (connectionString.toLowerCase().includes('user id=')) {
+    if (normalizedConnectionString.includes('user id=')) {
       return 'mssql';
     }
 
@@ -117,8 +119,9 @@ export class ConnectionStringParser {
     const parts = connectionString.match(DIALECT_PARTS_REGEXP)!;
     const protocol = parts[1]!;
     const tail = parts[2]!;
+    const normalizedProtocol = protocol.toLowerCase();
     const normalizedConnectionString =
-      protocol === 'pg' ? `postgres${tail}` : connectionString;
+      normalizedProtocol === 'pg' ? `postgres${tail}` : connectionString;
     const dialect = options.dialect ?? this.#inferDialectName(connectionString);
 
     return {

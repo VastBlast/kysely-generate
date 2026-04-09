@@ -1,8 +1,9 @@
-import { type Kysely } from 'kysely';
+import Database from 'better-sqlite3';
+import { Kysely, SqliteDialect, type Dialect as KyselyDialect } from 'kysely';
 import { deepStrictEqual } from 'node:assert';
 import parsePostgresInterval from 'postgres-interval';
 import { migrate } from '../introspector/introspector.fixtures';
-import type { IntrospectorDialect } from './dialect';
+import { IntrospectorDialect } from './dialect';
 import { LibsqlIntrospectorDialect } from './dialects/libsql/libsql-dialect';
 import { MysqlIntrospectorDialect } from './dialects/mysql/mysql-dialect';
 import { PostgresIntrospectorDialect } from './dialects/postgres/postgres-dialect';
@@ -12,7 +13,7 @@ import { Introspector } from './introspector';
 import { ColumnMetadata } from './metadata/column-metadata';
 import { DatabaseMetadata } from './metadata/database-metadata';
 import { TableMetadata } from './metadata/table-metadata';
-import { describe, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 type Test = {
   connectionString: string;
@@ -100,6 +101,63 @@ const testValues = async (
 };
 
 describe(Introspector.name, () => {
+  it('should destroy a failed SSL connection before retrying without SSL', async () => {
+    class TestIntrospector extends Introspector<any> {
+      override async introspect() {
+        return new DatabaseMetadata({ tables: [] });
+      }
+    }
+
+    class TestDialect extends IntrospectorDialect {
+      constructor(
+        override readonly introspector: Introspector<any>,
+        readonly sslAttempts: boolean[],
+      ) {
+        super();
+      }
+
+      override async createKyselyDialect(options: {
+        connectionString: string;
+        ssl?: boolean;
+      }): Promise<KyselyDialect> {
+        this.sslAttempts.push(options.ssl ?? false);
+
+        return new SqliteDialect({
+          database: new Database(options.connectionString),
+        });
+      }
+    }
+
+    const introspector = new TestIntrospector();
+    let connectionAttempts = 0;
+
+    (introspector as any).establishDatabaseConnection = async () => {
+      connectionAttempts++;
+
+      if (connectionAttempts === 1) {
+        throw new Error('SSL is not enabled');
+      }
+    };
+
+    const sslAttempts: boolean[] = [];
+    const destroySpy = vi.spyOn(Kysely.prototype, 'destroy');
+    let db: Kysely<any> | undefined;
+
+    try {
+      db = await introspector.connect({
+        connectionString: ':memory:',
+        dialect: new TestDialect(introspector, sslAttempts),
+      });
+
+      expect(connectionAttempts).toBe(2);
+      expect(sslAttempts).toStrictEqual([true, false]);
+      expect(destroySpy).toHaveBeenCalledTimes(1);
+    } finally {
+      await db?.destroy();
+      destroySpy.mockRestore();
+    }
+  });
+
   it('should return the correct metadata for each dialect', async () => {
     for (const {
       connectionString,
