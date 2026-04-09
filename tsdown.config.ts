@@ -9,5 +9,7 @@ export default defineConfig({
     dts: true,
     cjsDefault: true,
     format: ['cjs', 'esm'],
-    external: [/^bun(:.*)?$/], // bun:* e.g., bun:sqlite
+    deps: {
+        neverBundle: [/^bun(:.*)?$/], // bun:* e.g., bun:sqlite
+    }
 });
