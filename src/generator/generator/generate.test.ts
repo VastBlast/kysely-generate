@@ -502,6 +502,32 @@ describe(serializeFromMetadata.name, () => {
         `,
       );
     });
+
+    test('MariaDB UUID mapping', () => {
+      expect(
+        serialize({
+          dialect: new MysqlDialect(),
+          metadata: {
+            tables: [
+              {
+                columns: [{ dataType: 'uuid', name: 'id' }],
+                name: 'users',
+              },
+            ],
+          },
+        }),
+      ).toStrictEqual(
+        dedent`
+          export interface Users {
+            id: string;
+          }
+
+          export interface DB {
+            users: Users;
+          }
+        `,
+      );
+    });
   });
 
   test('logger', () => {
