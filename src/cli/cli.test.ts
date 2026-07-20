@@ -501,6 +501,25 @@ describe(Cli.name, () => {
     assert(['--verify=true'], { verify: true });
   });
 
+  it('should preserve a custom serializer object', () => {
+    const serializer = {
+      prefix: 'custom',
+      serializeFile() {
+        return `${this.prefix} output`;
+      },
+    };
+
+    const options = new Cli().parseOptions([], {
+      config: { serializer },
+      silent: true,
+    });
+
+    expect(options.serializer).toBe(serializer);
+    expect(options.serializer?.serializeFile({} as never, {} as never)).toBe(
+      'custom output',
+    );
+  });
+
   it('should throw an error if a CLI option has an invalid value', () => {
     const assert = (args: string[], message: string) => {
       expect(() =>

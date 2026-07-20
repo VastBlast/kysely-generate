@@ -22,7 +22,6 @@ import {
   UnionExpressionNode,
 } from '../generator';
 import type { DateParser, NumericParser } from '../introspector';
-import { DatabaseMetadata, IntrospectorDialect } from '../introspector';
 
 export type Config = {
   camelCase?: boolean;
@@ -91,6 +90,15 @@ const mysqlDateStringTypeSchema = z.preprocess(
   z.enum(MYSQL_DATE_STRING_TYPES),
 );
 
+const serializerSchema = z.custom<Serializer>((value) => {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'serializeFile' in value &&
+    typeof value.serializeFile === 'function'
+  );
+});
+
 export const configSchema = z.object({
   camelCase: z.boolean().optional(),
   customImports: z.record(z.string(), z.string()).optional(),
@@ -119,26 +127,7 @@ export const configSchema = z.object({
       z.enum<RuntimeEnumsStyle[]>(['pascal-case', 'screaming-snake-case']),
     ])
     .optional(),
-  serializer: z
-    .object({
-      serializeFile: z.function({
-        input: z.tuple([
-          z.instanceof(DatabaseMetadata),
-          z.instanceof(IntrospectorDialect),
-          z
-            .object({
-              camelCase: z.boolean().optional(),
-              customImports: z.record(z.string(), z.string()).optional(),
-              defaultSchemas: z.string().array().optional(),
-              overrides: overridesSchema.optional(),
-              typeMapping: z.record(z.string(), z.string()).optional(),
-            })
-            .optional(),
-        ]),
-        output: z.string(),
-      }),
-    })
-    .optional(),
+  serializer: serializerSchema.optional(),
   singularize: z
     .union([z.boolean(), z.record(z.string(), z.string())])
     .optional(),
