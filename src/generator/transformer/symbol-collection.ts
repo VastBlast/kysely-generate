@@ -30,6 +30,9 @@ export type SymbolType =
   | 'RuntimeEnumMember'
   | 'Table';
 
+const IDENTIFIER_START_REGEXP = /^[$_\p{ID_Start}]/u;
+const INVALID_IDENTIFIER_PART_REGEXP = /[^$\p{ID_Continue}\u200c\u200d]/gu;
+
 const convertIdentifier = (identifier: string, style: IdentifierStyle) => {
   switch (style) {
     case 'kysely-pascal-case':
@@ -87,7 +90,7 @@ export class SymbolCollection {
 
   reserveName(id: string) {
     let symbolName = convertIdentifier(
-      id.replaceAll(/[^\w$]/g, '_'),
+      id.replaceAll(INVALID_IDENTIFIER_PART_REGEXP, '_'),
       this.identifierStyle,
     );
 
@@ -95,7 +98,7 @@ export class SymbolCollection {
       symbolName = '_';
     }
 
-    if (/^\d/.test(symbolName)) {
+    if (!IDENTIFIER_START_REGEXP.test(symbolName)) {
       symbolName = `_${symbolName}`;
     }
 

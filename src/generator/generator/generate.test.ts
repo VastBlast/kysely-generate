@@ -832,6 +832,25 @@ describe(serializeFromMetadata.name, () => {
     );
   });
 
+  test('singularize preserves Unicode table identifiers', () => {
+    expect(
+      serialize({
+        metadata: {
+          tables: [{ columns: [], name: 'élèves-items', schema: 'public' }],
+        },
+        singularize: true,
+      }),
+    ).toStrictEqual(
+      dedent`
+        export interface ÉlèvesItem {}
+
+        export interface DB {
+          "élèves-items": ÉlèvesItem;
+        }
+      `,
+    );
+  });
+
   test('customImports', () => {
     expect(
       serialize({

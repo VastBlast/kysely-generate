@@ -19,6 +19,9 @@ test(SymbolCollection.name, () => {
   symbols.set('0x123', symbol);
   symbols.set('!', symbol);
   symbols.set('"', symbol);
+  symbols.set('élèves-items', symbol);
+  symbols.set('東京_items', symbol);
+  symbols.set('١users', symbol);
 
   deepStrictEqual(symbols.symbolNames, {
     'foo-bar': 'FooBar',
@@ -29,6 +32,9 @@ test(SymbolCollection.name, () => {
     '0x123': '_0x123',
     '!': '_',
     '"': '_2',
+    'élèves-items': 'ÉlèvesItems',
+    東京_items: '東京Items',
+    '١users': '_١users',
   });
 
   for (const id of ['constructor', 'toString', '__proto__']) {
