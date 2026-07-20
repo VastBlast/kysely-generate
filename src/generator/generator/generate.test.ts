@@ -20,6 +20,7 @@ import { JsonColumnTypeNode } from '../ast/json-column-type-node';
 import { RawExpressionNode } from '../ast/raw-expression-node';
 import type { GeneratorDialect } from '../dialect';
 import { LibsqlDialect } from '../dialects/libsql/libsql-dialect';
+import { MssqlDialect } from '../dialects/mssql/mssql-dialect';
 import { MysqlDialect } from '../dialects/mysql/mysql-dialect';
 import type { PostgresDialectOptions } from '../dialects/postgres/postgres-dialect';
 import { PostgresDialect } from '../dialects/postgres/postgres-dialect';
@@ -524,6 +525,102 @@ describe(serializeFromMetadata.name, () => {
 
           export interface DB {
             users: Users;
+          }
+        `,
+      );
+    });
+
+    test('MssqlDialect bigint mapping', () => {
+      expect(
+        serialize({
+          dialect: new MssqlDialect(),
+          metadata: {
+            tables: [
+              {
+                columns: [{ dataType: 'bigint', name: 'id' }],
+                name: 'users',
+              },
+            ],
+          },
+        }),
+      ).toStrictEqual(
+        dedent`
+          import type { ColumnType } from "kysely";
+
+          export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
+          export interface Users {
+            id: Int8;
+          }
+
+          export interface DB {
+            users: Users;
+          }
+        `,
+      );
+    });
+
+    test('MssqlDialect XML mapping', () => {
+      expect(
+        serialize({
+          dialect: new MssqlDialect(),
+          metadata: {
+            tables: [
+              {
+                columns: [{ dataType: 'xml', name: 'document' }],
+                name: 'records',
+              },
+            ],
+          },
+        }),
+      ).toStrictEqual(
+        dedent`
+          export interface Records {
+            document: string;
+          }
+
+          export interface DB {
+            records: Records;
+          }
+        `,
+      );
+    });
+
+    test('MssqlDialect row version mapping', () => {
+      expect(
+        serialize({
+          dialect: new MssqlDialect(),
+          metadata: {
+            tables: [
+              {
+                columns: [
+                  {
+                    dataType: 'timestamp',
+                    hasDefaultValue: true,
+                    name: 'version',
+                  },
+                ],
+                name: 'records',
+              },
+            ],
+          },
+        }),
+      ).toStrictEqual(
+        dedent`
+          import type { ColumnType } from "kysely";
+
+          export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
+            ? ColumnType<S, I | undefined, U>
+            : ColumnType<T, T | undefined, T>;
+
+          export type RowVersion = ColumnType<Buffer, never, never>;
+
+          export interface Records {
+            version: Generated<RowVersion>;
+          }
+
+          export interface DB {
+            records: Records;
           }
         `,
       );
