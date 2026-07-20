@@ -1,4 +1,5 @@
 import type { Kysely, TableMetadata as KyselyTableMetadata } from 'kysely';
+import { sql } from 'kysely';
 import { EnumCollection } from '../../enum-collection';
 import type { IntrospectOptions } from '../../introspector';
 import { Introspector } from '../../introspector';
@@ -42,6 +43,7 @@ export class MysqlIntrospector extends Introspector<MysqlDB> {
       .withoutPlugins()
       .selectFrom('information_schema.COLUMNS')
       .select(['COLUMN_NAME', 'COLUMN_TYPE', 'TABLE_NAME', 'TABLE_SCHEMA'])
+      .where('TABLE_SCHEMA', '=', sql<string>`database()`)
       .execute();
 
     for (const row of rows) {
