@@ -1,4 +1,3 @@
-import type { Config } from 'cosmiconfig';
 import { execa, ExecaError } from 'execa';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { deepStrictEqual } from 'node:assert';
@@ -8,6 +7,7 @@ import { Pool } from 'pg';
 import { dedent } from 'ts-dedent';
 import packageJson from '../../package.json';
 import { Cli } from './cli';
+import type { Config } from './config';
 import { ConfigError } from './config-error';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { migrate } from '../introspector/introspector.fixtures';
