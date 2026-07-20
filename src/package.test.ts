@@ -57,7 +57,9 @@ describe('package', () => {
               'await generate({',
               '  db: {},',
               '  dialect: { introspector: { introspect: async () => ({ tables: [] }) } },',
-              "  serializer: { serializeFile: () => 'export interface DB { users: { id: number } }\\n' },",
+              '  serializer: {',
+              "    serializeFile: () => 'import type { IPostgresInterval } from \\\"postgres-interval\\\";\\nexport interface DB { interval: IPostgresInterval; users: { id: number } }\\n',",
+              '  },',
               '});',
             ].join('\n'),
           ],
@@ -79,6 +81,16 @@ describe('package', () => {
             'void generate;',
           ].join('\n'),
         );
+        for (const extension of ['cts', 'mts']) {
+          await writeFile(
+            join(consumerDirectory, `db-consumer.${extension}`),
+            [
+              "import type { DB } from 'kysely-generate/db';",
+              'const interval: DB[\'interval\'] | undefined = undefined;',
+              'void interval;',
+            ].join('\n'),
+          );
+        }
         await writeFile(
           join(consumerDirectory, 'tsconfig.json'),
           JSON.stringify({
@@ -93,21 +105,37 @@ describe('package', () => {
             include: ['consumer.mts', 'consumer.cts'],
           }),
         );
-
-        const result = await execa(
-          process.execPath,
-          [
-            join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
-            '--project',
-            join(consumerDirectory, 'tsconfig.json'),
-          ],
-          { reject: false },
+        await writeFile(
+          join(consumerDirectory, 'tsconfig-db.json'),
+          JSON.stringify({
+            compilerOptions: {
+              module: 'NodeNext',
+              moduleResolution: 'NodeNext',
+              noEmit: true,
+              strict: true,
+              target: 'ES2022',
+              types: [],
+            },
+            include: ['db-consumer.mts', 'db-consumer.cts'],
+          }),
         );
 
-        expect(
-          result.exitCode,
-          result.stdout || result.stderr || JSON.stringify(result),
-        ).toBe(0);
+        for (const project of ['tsconfig.json', 'tsconfig-db.json']) {
+          const result = await execa(
+            process.execPath,
+            [
+              join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc'),
+              '--project',
+              join(consumerDirectory, project),
+            ],
+            { reject: false },
+          );
+
+          expect(
+            result.exitCode,
+            result.stdout || result.stderr || JSON.stringify(result),
+          ).toBe(0);
+        }
         await execa(
           process.execPath,
           ['--input-type=module', '--eval', "await import('kysely-generate')"],
