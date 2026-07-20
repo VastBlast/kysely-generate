@@ -29,17 +29,21 @@ export class ConnectionStringParser {
   #inferDialectName(connectionString: string): DialectName {
     const normalizedConnectionString = connectionString.toLowerCase();
 
-    if (normalizedConnectionString.startsWith('libsql')) {
+    if (normalizedConnectionString.startsWith('libsql:')) {
       return 'libsql';
     }
 
-    if (normalizedConnectionString.startsWith('mysql')) {
+    if (
+      normalizedConnectionString.startsWith('mysql:') ||
+      normalizedConnectionString.startsWith('mysqlx:')
+    ) {
       return 'mysql';
     }
 
     if (
-      normalizedConnectionString.startsWith('postgres') ||
-      normalizedConnectionString.startsWith('pg')
+      normalizedConnectionString.startsWith('postgres:') ||
+      normalizedConnectionString.startsWith('postgresql:') ||
+      normalizedConnectionString.startsWith('pg:')
     ) {
       return 'postgres';
     }
