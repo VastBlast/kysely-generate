@@ -62,6 +62,7 @@ type TransformContext = {
   runtimeEnums: boolean | RuntimeEnumsStyle;
   scalars: Scalars;
   symbols: SymbolCollection;
+  tableNameNormalizer: ((name: string) => string) | undefined;
   tableNames: Map<string, string>;
   typeMapping: Record<string, string> | undefined;
 };
@@ -74,6 +75,7 @@ export type TransformOptions = {
   metadata: DatabaseMetadata;
   overrides?: Overrides;
   runtimeEnums?: boolean | RuntimeEnumsStyle;
+  tableNameNormalizer?: (name: string) => string;
   typeMapping?: Record<string, string>;
 };
 
@@ -560,6 +562,7 @@ const createContext = (options: TransformOptions): TransformContext => {
       ...options.dialect.adapter.scalars,
     },
     symbols: new SymbolCollection(),
+    tableNameNormalizer: options.tableNameNormalizer,
     tableNames: new Map(),
     typeMapping: options.typeMapping,
   };
@@ -573,7 +576,9 @@ const createDatabaseExportNode = (context: TransformContext) => {
     const symbolName = context.tableNames.get(identifier);
 
     if (symbolName) {
-      const value = new TableIdentifierNode(symbolName);
+      const value = context.tableNameNormalizer
+        ? new IdentifierNode(symbolName)
+        : new TableIdentifierNode(symbolName);
       const tableProperty = new PropertyNode(identifier, value);
       tableProperties.push(tableProperty);
     }
@@ -848,13 +853,20 @@ const transformTables = (context: TransformContext) => {
     let symbolName = context.tableNames.get(identifier);
 
     if (!symbolName) {
-      symbolName = context.symbols.reserveName(identifier);
+      symbolName = context.symbols.reserveName(
+        identifier,
+        context.tableNameNormalizer,
+      );
       context.tableNames.set(identifier, symbolName);
     }
 
+    const tableIdentifier = context.tableNameNormalizer
+      ? new IdentifierNode(symbolName)
+      : new TableIdentifierNode(symbolName);
+
     const tableNode = new ExportStatementNode(
       new InterfaceDeclarationNode(
-        new TableIdentifierNode(symbolName),
+        tableIdentifier,
         expression,
       ),
     );

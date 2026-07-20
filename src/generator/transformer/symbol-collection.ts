@@ -88,11 +88,18 @@ export class SymbolCollection {
     return this.get(id) !== undefined;
   }
 
-  reserveName(id: string) {
+  reserveName(id: string, normalize?: (identifier: string) => string) {
     let symbolName = convertIdentifier(
       id.replaceAll(INVALID_IDENTIFIER_PART_REGEXP, '_'),
       this.identifierStyle,
     );
+
+    if (normalize) {
+      symbolName = normalize(symbolName).replaceAll(
+        INVALID_IDENTIFIER_PART_REGEXP,
+        '_',
+      );
+    }
 
     if (!symbolName) {
       symbolName = '_';

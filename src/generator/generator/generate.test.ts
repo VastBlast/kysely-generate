@@ -851,6 +851,62 @@ describe(serializeFromMetadata.name, () => {
     );
   });
 
+  test('singularize keeps table type names unique', () => {
+    expect(
+      serialize({
+        metadata: {
+          tables: [
+            { columns: [], name: 'user', schema: 'public' },
+            { columns: [], name: 'users', schema: 'public' },
+          ],
+        },
+        singularize: true,
+      }),
+    ).toStrictEqual(
+      dedent`
+        export interface User {}
+
+        export interface User2 {}
+
+        export interface DB {
+          user: User;
+          users: User2;
+        }
+      `,
+    );
+  });
+
+  test('singularized table types do not collide with imports', () => {
+    expect(
+      serialize({
+        customImports: { User: './types' },
+        metadata: {
+          tables: [
+            {
+              columns: [{ dataType: 'text', name: 'owner' }],
+              name: 'users',
+              schema: 'public',
+            },
+          ],
+        },
+        overrides: { columns: { 'users.owner': new IdentifierNode('User') } },
+        singularize: true,
+      }),
+    ).toStrictEqual(
+      dedent`
+        import type { User } from "./types";
+
+        export interface User2 {
+          owner: User;
+        }
+
+        export interface DB {
+          users: User2;
+        }
+      `,
+    );
+  });
+
   test('customImports', () => {
     expect(
       serialize({

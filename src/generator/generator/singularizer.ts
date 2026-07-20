@@ -1,4 +1,23 @@
+import { toPascalCase } from '../utils/case-converter';
+
 const REGEXP_KEY = /^\/(.*)\/(.*)$/;
+
+export type Singularizer = (word: string) => string;
+
+export const normalizeTableIdentifier = (
+  identifier: string,
+  singularize: Singularizer,
+) => {
+  const singularIdentifier = toPascalCase(singularize(identifier));
+
+  if (!singularIdentifier) {
+    return identifier;
+  }
+
+  return /^\d/.test(singularIdentifier)
+    ? `_${singularIdentifier}`
+    : singularIdentifier;
+};
 
 const addSingularizationRules = (
   pluralize: typeof import('pluralize'),
