@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "kysely-generate",
-  "version": "0.21.6",
+  "version": "0.22.0",
   "author": "VastBlast",
   "license": "MIT",
   "bin": {
@@ -60,7 +60,7 @@
     "kysely-postgres-js": "^3.0.0",
     "mysql2": "^3.14.4",
     "oxlint": "^1.66.0",
-    "oxlint-tsgolint": "^0.23.0",
+    "oxlint-tsgolint": "^0.25.0",
     "pg": "^8.16.3",
     "postgres": "^3.4.9",
     "prettier": "^3.6.2",
