@@ -76,7 +76,7 @@ export const generate = async (options: GenerateOptions) => {
     if (options.verify) {
       const oldOutput = await fs.readFile(outFile, 'utf8');
       const diffChecker = new DiffChecker();
-      const diff = diffChecker.diff(newOutput, oldOutput);
+      const diff = diffChecker.diff(oldOutput, newOutput);
 
       if (diff) {
         options.logger?.error(diff);

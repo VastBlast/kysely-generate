@@ -1,6 +1,7 @@
 import { sql } from 'kysely';
 import { strictEqual } from 'node:assert';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { dedent } from 'ts-dedent';
 import type {
@@ -28,7 +29,7 @@ import { Logger } from '../logger/logger';
 import { toKyselyCamelCase } from '../utils/case-converter';
 import type { GenerateOptions, SerializeFromMetadataOptions } from './generate';
 import { generate, serializeFromMetadata } from './generate';
-import { describe, expect, it, test } from 'vitest';
+import { describe, expect, it, test, vi } from 'vitest';
 
 type Test = {
   connectionString: string;
@@ -283,6 +284,37 @@ describe(generate.name, () => {
       await db.destroy();
     }
   }, TEST_TIMEOUT);
+
+  it('should display verification changes from the existing output to the generated output', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kysely-generate-'));
+    const outFile = join(directory, 'db.ts');
+    const logger = new Logger('error');
+    const logError = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const dialect = {
+      introspector: {
+        introspect: async () => new DatabaseMetadata({ tables: [] }),
+      },
+    } as unknown as GeneratorDialect;
+
+    try {
+      await writeFile(outFile, 'old\n');
+
+      await expect(
+        generate({
+          db: {} as GenerateOptions['db'],
+          dialect,
+          logger,
+          outFile,
+          serializer: { serializeFile: () => 'new\n' },
+          verify: true,
+        }),
+      ).rejects.toThrow('Generated types are not up-to-date!');
+
+      expect(logError).toHaveBeenCalledWith('-old\n+new\n');
+    } finally {
+      await rm(directory, { recursive: true });
+    }
+  });
 });
 
 describe(serializeFromMetadata.name, () => {
