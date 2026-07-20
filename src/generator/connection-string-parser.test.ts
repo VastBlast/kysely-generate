@@ -28,6 +28,21 @@ describe(ConnectionStringParser.name, () => {
     }
   });
 
+  it('should trim whitespace around environment variable names', () => {
+    process.env.KYSELY_GENERATE_TEST_URL = ':memory:';
+
+    try {
+      deepStrictEqual(
+        parser.parse({
+          connectionString: 'env( KYSELY_GENERATE_TEST_URL )',
+        }),
+        { connectionString: ':memory:', dialect: 'sqlite' },
+      );
+    } finally {
+      delete process.env.KYSELY_GENERATE_TEST_URL;
+    }
+  });
+
   describe('postgres', () => {
     it('should infer the correct dialect name', () => {
       deepStrictEqual(

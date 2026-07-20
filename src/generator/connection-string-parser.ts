@@ -63,7 +63,7 @@ export class ConnectionStringParser {
         throw new ReferenceError(`Function '${name}' is not defined.`);
       }
 
-      const keyToken = expressionMatch[2]!;
+      const keyToken = expressionMatch[2]!.trim();
       let key: string | undefined;
 
       try {
