@@ -849,4 +849,33 @@ describe(serializeFromMetadata.name, () => {
       `,
     );
   });
+
+  test('PostgreSQL timetz type mapping', () => {
+    expect(
+      serialize({
+        customImports: { ZonedTime: './custom-types' },
+        metadata: {
+          tables: [
+            {
+              columns: [{ dataType: 'timetz', name: 'starts_at' }],
+              name: 'events',
+            },
+          ],
+        },
+        typeMapping: { timetz: 'ZonedTime' },
+      }),
+    ).toStrictEqual(
+      dedent`
+        import type { ZonedTime } from "./custom-types";
+
+        export interface Events {
+          starts_at: ZonedTime;
+        }
+
+        export interface DB {
+          events: Events;
+        }
+      `,
+    );
+  });
 });
