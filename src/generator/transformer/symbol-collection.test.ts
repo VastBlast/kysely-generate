@@ -44,4 +44,10 @@ test(SymbolCollection.name, () => {
     strictEqual(symbols.getName(id), name);
     strictEqual(symbols.has(id), true);
   }
+
+  const mutableSymbols = new SymbolCollection();
+  mutableSymbols.symbolNames.external = 'Manual';
+  strictEqual(mutableSymbols.set('manual', symbol), 'Manual2');
+  delete mutableSymbols.symbolNames.external;
+  strictEqual(mutableSymbols.set('manual!', symbol), 'Manual');
 });

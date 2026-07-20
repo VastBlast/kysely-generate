@@ -48,7 +48,7 @@ export class SymbolCollection {
   readonly identifierStyle: IdentifierStyle;
   readonly symbolNames: SymbolNameMap = {};
   readonly symbols: SymbolMap = {};
-  private readonly usedNames = new Set<string>();
+  private readonly reservedNames = new Set<string>();
 
   constructor(options?: {
     entries?: SymbolEntry[];
@@ -113,9 +113,12 @@ export class SymbolCollection {
       symbolName = `_${symbolName}`;
     }
 
+    const usedNames = new Set(Object.values(this.symbolNames));
     const isUnavailable = (name: string) => {
       return (
-        this.usedNames.has(name) || reservedNames?.has(name) === true
+        usedNames.has(name) ||
+        this.reservedNames.has(name) ||
+        reservedNames?.has(name) === true
       );
     };
 
@@ -129,7 +132,7 @@ export class SymbolCollection {
       symbolName += suffix;
     }
 
-    this.usedNames.add(symbolName);
+    this.reservedNames.add(symbolName);
 
     return symbolName;
   }
@@ -146,6 +149,7 @@ export class SymbolCollection {
     }
 
     const symbolName = this.reserveName(id, undefined, reservedNames);
+    this.reservedNames.delete(symbolName);
     Object.defineProperty(this.symbols, id, {
       configurable: true,
       enumerable: true,
