@@ -22,6 +22,7 @@ export * from './ast/raw-expression-node';
 export * from './ast/runtime-enum-declaration-node';
 export * from './ast/statement-node';
 export * from './ast/template-node';
+export * from './ast/type-export-statement-node';
 export * from './ast/union-expression-node';
 export * from './connection-string-parser';
 export * from './constants';

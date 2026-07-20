@@ -19,6 +19,7 @@ import { PropertyNode } from '../ast/property-node';
 import { RawExpressionNode } from '../ast/raw-expression-node';
 import { RuntimeEnumDeclarationNode } from '../ast/runtime-enum-declaration-node';
 import type { TemplateNode } from '../ast/template-node';
+import { TypeExportStatementNode } from '../ast/type-export-statement-node';
 import { UnionExpressionNode } from '../ast/union-expression-node';
 import type { GeneratorDialect } from '../dialect';
 import { PostgresAdapter } from '../dialects/postgres/postgres-adapter';
@@ -93,6 +94,9 @@ const POSTGRES_RANGE_TYPES = new Set([
   'tstzmultirange',
   'tstzrange',
 ]);
+
+const DATABASE_TYPE_NAME = 'DB';
+const RESERVED_DATABASE_TYPE_NAMES = new Set([DATABASE_TYPE_NAME]);
 
 const getOwn = <T>(
   record: Record<string, T | undefined> | undefined,
@@ -568,7 +572,10 @@ const createContext = (options: TransformOptions): TransformContext => {
   };
 };
 
-const createDatabaseExportNode = (context: TransformContext) => {
+const createDatabaseNodes = (
+  context: TransformContext,
+  databaseName: string,
+) => {
   const tableProperties: PropertyNode[] = [];
 
   for (const table of context.metadata.tables) {
@@ -587,8 +594,17 @@ const createDatabaseExportNode = (context: TransformContext) => {
   tableProperties.sort((a, b) => a.key.localeCompare(b.key));
 
   const body = new ObjectExpressionNode(tableProperties);
-  const argument = new InterfaceDeclarationNode(new IdentifierNode('DB'), body);
-  return new ExportStatementNode(argument);
+  const declaration = new InterfaceDeclarationNode(
+    new IdentifierNode(databaseName),
+    body,
+  );
+
+  return databaseName === DATABASE_TYPE_NAME
+    ? [new ExportStatementNode(declaration)]
+    : [
+        declaration,
+        new TypeExportStatementNode(databaseName, DATABASE_TYPE_NAME),
+      ];
 };
 
 const createRuntimeEnumDefinitionNodes = (context: TransformContext) => {
@@ -789,15 +805,23 @@ const transformColumnToArgs = (
         node: new RuntimeEnumDeclarationNode(symbolId, enumValues),
         type: 'RuntimeEnumDefinition',
       };
-      symbol.node.id.name = context.symbols.set(symbolId, symbol);
+      symbol.node.id.name = context.symbols.set(
+        symbolId,
+        symbol,
+        RESERVED_DATABASE_TYPE_NAMES,
+      );
       const node = new IdentifierNode(symbol.node.id.name);
       return [node];
     }
 
-    const symbolName = context.symbols.set(symbolId, {
-      node: unionize(transformEnum(enumValues)),
-      type: 'Definition',
-    });
+    const symbolName = context.symbols.set(
+      symbolId,
+      {
+        node: unionize(transformEnum(enumValues)),
+        type: 'Definition',
+      },
+      RESERVED_DATABASE_TYPE_NAMES,
+    );
     const node = new IdentifierNode(symbolName);
     return [node];
   }
@@ -848,6 +872,7 @@ const transformTables = (context: TransformContext) => {
       identifier: getTableIdentifier(table, context),
     };
   });
+  const databaseName = context.symbols.reserveName(DATABASE_TYPE_NAME);
 
   for (const { expression, identifier } of tables) {
     let symbolName = context.tableNames.get(identifier);
@@ -877,7 +902,7 @@ const transformTables = (context: TransformContext) => {
     a.argument.id.name.localeCompare(b.argument.id.name),
   );
 
-  return tableNodes;
+  return { databaseName, tableNodes };
 };
 
 const unionize = (args: ExpressionNode[]) => {
@@ -893,17 +918,17 @@ const unionize = (args: ExpressionNode[]) => {
 
 export const transform = (options: TransformOptions) => {
   const context = createContext(options);
-  const tableNodes = transformTables(context);
+  const { databaseName, tableNodes } = transformTables(context);
   const importNodes = createImportNodes(context);
   const runtimeEnumDefinitionNodes = createRuntimeEnumDefinitionNodes(context);
   const definitionNodes = createDefinitionNodes(context);
-  const databaseNode = createDatabaseExportNode(context);
+  const databaseNodes = createDatabaseNodes(context, databaseName);
 
   return [
     ...importNodes,
     ...runtimeEnumDefinitionNodes,
     ...definitionNodes,
     ...tableNodes,
-    databaseNode,
+    ...databaseNodes,
   ];
 };

@@ -88,7 +88,11 @@ export class SymbolCollection {
     return this.get(id) !== undefined;
   }
 
-  reserveName(id: string, normalize?: (identifier: string) => string) {
+  reserveName(
+    id: string,
+    normalize?: (identifier: string) => string,
+    reservedNames?: ReadonlySet<string>,
+  ) {
     let symbolName = convertIdentifier(
       id.replaceAll(INVALID_IDENTIFIER_PART_REGEXP, '_'),
       this.identifierStyle,
@@ -109,10 +113,16 @@ export class SymbolCollection {
       symbolName = `_${symbolName}`;
     }
 
-    if (this.usedNames.has(symbolName)) {
+    const isUnavailable = (name: string) => {
+      return (
+        this.usedNames.has(name) || reservedNames?.has(name) === true
+      );
+    };
+
+    if (isUnavailable(symbolName)) {
       let suffix = 2;
 
-      while (this.usedNames.has(`${symbolName}${suffix}`)) {
+      while (isUnavailable(`${symbolName}${suffix}`)) {
         suffix++;
       }
 
@@ -124,14 +134,18 @@ export class SymbolCollection {
     return symbolName;
   }
 
-  set(id: string, symbol: SymbolNode) {
+  set(
+    id: string,
+    symbol: SymbolNode,
+    reservedNames?: ReadonlySet<string>,
+  ) {
     const existingName = this.getName(id);
 
     if (existingName) {
       return existingName;
     }
 
-    const symbolName = this.reserveName(id);
+    const symbolName = this.reserveName(id, undefined, reservedNames);
     Object.defineProperty(this.symbols, id, {
       configurable: true,
       enumerable: true,

@@ -8,7 +8,11 @@ import type {
   DatabaseMetadataOptions,
   IntrospectOptions,
 } from '../../introspector';
-import { DatabaseMetadata, PostgresIntrospector } from '../../introspector';
+import {
+  DatabaseMetadata,
+  EnumCollection,
+  PostgresIntrospector,
+} from '../../introspector';
 import {
   addExtraColumn,
   migrate,
@@ -905,6 +909,95 @@ describe(serializeFromMetadata.name, () => {
         }
       `,
     );
+  });
+
+  test('table type names do not collide with the database export', () => {
+    expect(
+      serialize({
+        metadata: { tables: [{ columns: [], name: 'DB', schema: 'public' }] },
+      }),
+    ).toStrictEqual(
+      dedent`
+        export interface DB2 {}
+
+        export interface DB {
+          DB: DB2;
+        }
+      `,
+    );
+  });
+
+  test('database exports do not collide with custom imports', () => {
+    expect(
+      serialize({
+        customImports: { DB: './types' },
+        metadata: {
+          tables: [
+            {
+              columns: [
+                { dataType: 'text', name: 'raw' },
+                { dataType: 'text', name: 'structured' },
+              ],
+              name: 'events',
+              schema: 'public',
+            },
+          ],
+        },
+        overrides: {
+          columns: {
+            'events.raw': 'DB',
+            'events.structured': new IdentifierNode('DB'),
+          },
+        },
+      }),
+    ).toStrictEqual(
+      dedent`
+        import type { DB } from "./types";
+
+        export interface Events {
+          raw: DB;
+          structured: DB;
+        }
+
+        interface DB2 {
+          events: Events;
+        }
+
+        export type { DB2 as DB };
+      `,
+    );
+  });
+
+  test('enum type names do not collide with the database export', () => {
+    for (const runtimeEnums of [false, true]) {
+      const output = serialize({
+        metadata: {
+          enums: new EnumCollection({ 'public.d_b': ['active'] }),
+          tables: [
+            {
+              columns: [
+                {
+                  dataType: 'd_b',
+                  dataTypeSchema: 'public',
+                  name: 'status',
+                },
+              ],
+              name: 'items',
+              schema: 'public',
+            },
+          ],
+        },
+        runtimeEnums,
+      });
+
+      expect(output).toContain(
+        runtimeEnums ? 'export enum DB2 {' : 'export type DB2 = "active";',
+      );
+      expect(output).toContain('status: DB2;');
+      expect(output).toContain('export interface DB {');
+      expect(output).not.toContain('export enum DB {');
+      expect(output).not.toContain('export type DB =');
+    }
   });
 
   test('customImports', () => {

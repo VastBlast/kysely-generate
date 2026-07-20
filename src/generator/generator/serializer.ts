@@ -17,6 +17,7 @@ import type { PropertyNode } from '../ast/property-node';
 import type { RawExpressionNode } from '../ast/raw-expression-node';
 import type { RuntimeEnumDeclarationNode } from '../ast/runtime-enum-declaration-node';
 import type { StatementNode } from '../ast/statement-node';
+import type { TypeExportStatementNode } from '../ast/type-export-statement-node';
 import type { UnionExpressionNode } from '../ast/union-expression-node';
 import type { GeneratorDialect } from '../dialect';
 import type { SymbolEntry } from '../transformer/symbol-collection';
@@ -426,6 +427,12 @@ export class TypeScriptSerializer implements Serializer {
         case 'ImportStatement':
           data += this.serializeImportStatement(node);
           break;
+        case 'InterfaceDeclaration':
+          data += this.serializeInterfaceDeclaration(node);
+          break;
+        case 'TypeExportStatement':
+          data += this.serializeTypeExportStatement(node);
+          break;
       }
 
       i++;
@@ -463,5 +470,9 @@ export class TypeScriptSerializer implements Serializer {
     }
 
     return data;
+  }
+
+  serializeTypeExportStatement(node: TypeExportStatementNode) {
+    return `export type { ${node.name} as ${node.alias} };`;
   }
 }
