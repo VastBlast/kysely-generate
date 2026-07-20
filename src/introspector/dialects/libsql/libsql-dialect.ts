@@ -14,7 +14,12 @@ export class LibsqlIntrospectorDialect extends IntrospectorDialect {
 
     if (url.username) {
       // The token takes the place of the username in the url:
-      const token = url.username;
+      let token = url.username;
+      try {
+        token = decodeURIComponent(token);
+      } catch {
+        // Preserve malformed percent sequences for backwards compatibility.
+      }
 
       // Remove the token from the url to get a "normal" connection string:
       url.username = '';
