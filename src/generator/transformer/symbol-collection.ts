@@ -45,6 +45,7 @@ export class SymbolCollection {
   readonly identifierStyle: IdentifierStyle;
   readonly symbolNames: SymbolNameMap = {};
   readonly symbols: SymbolMap = {};
+  private readonly usedNames = new Set<string>();
 
   constructor(options?: {
     entries?: SymbolEntry[];
@@ -84,14 +85,7 @@ export class SymbolCollection {
     return this.get(id) !== undefined;
   }
 
-  set(id: string, symbol: SymbolNode) {
-    const existingName = this.getName(id);
-
-    if (existingName) {
-      return existingName;
-    }
-
-    const symbolNames = new Set(Object.values(this.symbolNames));
+  reserveName(id: string) {
     let symbolName = convertIdentifier(
       id.replaceAll(/[^\w$]/g, '_'),
       this.identifierStyle,
@@ -105,16 +99,29 @@ export class SymbolCollection {
       symbolName = `_${symbolName}`;
     }
 
-    if (symbolNames.has(symbolName)) {
+    if (this.usedNames.has(symbolName)) {
       let suffix = 2;
 
-      while (symbolNames.has(`${symbolName}${suffix}`)) {
+      while (this.usedNames.has(`${symbolName}${suffix}`)) {
         suffix++;
       }
 
       symbolName += suffix;
     }
 
+    this.usedNames.add(symbolName);
+
+    return symbolName;
+  }
+
+  set(id: string, symbol: SymbolNode) {
+    const existingName = this.getName(id);
+
+    if (existingName) {
+      return existingName;
+    }
+
+    const symbolName = this.reserveName(id);
     Object.defineProperty(this.symbols, id, {
       configurable: true,
       enumerable: true,

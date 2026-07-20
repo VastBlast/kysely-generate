@@ -62,6 +62,7 @@ type TransformContext = {
   runtimeEnums: boolean | RuntimeEnumsStyle;
   scalars: Scalars;
   symbols: SymbolCollection;
+  tableNames: Map<string, string>;
   typeMapping: Record<string, string> | undefined;
 };
 
@@ -559,6 +560,7 @@ const createContext = (options: TransformOptions): TransformContext => {
       ...options.dialect.adapter.scalars,
     },
     symbols: new SymbolCollection(),
+    tableNames: new Map(),
     typeMapping: options.typeMapping,
   };
 };
@@ -568,7 +570,7 @@ const createDatabaseExportNode = (context: TransformContext) => {
 
   for (const table of context.metadata.tables) {
     const identifier = getTableIdentifier(table, context);
-    const symbolName = context.symbols.getName(identifier);
+    const symbolName = context.tableNames.get(identifier);
 
     if (symbolName) {
       const value = new TableIdentifierNode(symbolName);
@@ -825,8 +827,7 @@ const transformName = (name: string, context: TransformContext) => {
 
 const transformTables = (context: TransformContext) => {
   const tableNodes: ExportStatementNode[] = [];
-
-  for (const table of context.metadata.tables) {
+  const tables = context.metadata.tables.map((table) => {
     const tableProperties: PropertyNode[] = [];
 
     for (const column of table.columns) {
@@ -837,9 +838,20 @@ const transformTables = (context: TransformContext) => {
       tableProperties.push(tableProperty);
     }
 
-    const expression = new ObjectExpressionNode(tableProperties);
-    const identifier = getTableIdentifier(table, context);
-    const symbolName = context.symbols.set(identifier, { type: 'Table' });
+    return {
+      expression: new ObjectExpressionNode(tableProperties),
+      identifier: getTableIdentifier(table, context),
+    };
+  });
+
+  for (const { expression, identifier } of tables) {
+    let symbolName = context.tableNames.get(identifier);
+
+    if (!symbolName) {
+      symbolName = context.symbols.reserveName(identifier);
+      context.tableNames.set(identifier, symbolName);
+    }
+
     const tableNode = new ExportStatementNode(
       new InterfaceDeclarationNode(
         new TableIdentifierNode(symbolName),

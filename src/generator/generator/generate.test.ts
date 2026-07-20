@@ -560,6 +560,45 @@ describe(serializeFromMetadata.name, () => {
       );
     });
 
+    test('MssqlDialect definition and table name collision', () => {
+      expect(
+        serialize({
+          dialect: new MssqlDialect(),
+          metadata: {
+            tables: [
+              {
+                columns: [{ dataType: 'int', name: 'id' }],
+                name: 'Int8',
+              },
+              {
+                columns: [{ dataType: 'bigint', name: 'value' }],
+                name: 'records',
+              },
+            ],
+          },
+        }),
+      ).toStrictEqual(
+        dedent`
+          import type { ColumnType } from "kysely";
+
+          export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
+          export interface Int82 {
+            id: number;
+          }
+
+          export interface Records {
+            value: Int8;
+          }
+
+          export interface DB {
+            Int8: Int82;
+            records: Records;
+          }
+        `,
+      );
+    });
+
     test('MssqlDialect XML mapping', () => {
       expect(
         serialize({
