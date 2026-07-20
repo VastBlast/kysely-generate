@@ -138,5 +138,8 @@
       "require": "./dist/cli/bin.cjs"
     },
     "./package.json": "./package.json"
+  },
+  "allowScripts": {
+    "better-sqlite3": true
   }
 }
