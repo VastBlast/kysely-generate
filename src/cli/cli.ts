@@ -205,7 +205,7 @@ export class Cli {
         return this.#parseBoolean(input);
       default:
         throw new RangeError(
-          "Parameter '--runtime-enums' must have one of the following values: pascal-case, screaming-snake-case",
+          "Parameter '--runtime-enums' must have one of the following values: true, false, pascal-case, screaming-snake-case",
         );
     }
   }
@@ -304,39 +304,46 @@ export class Cli {
         })
       : {};
 
-    const cliOptions: Config = compact({
-      camelCase: this.#parseBoolean(argv['camel-case']),
-      customImports:
-        typeof argv['custom-imports'] === 'string'
-          ? JSON.parse(argv['custom-imports'])
-          : undefined,
-      dateParser: this.#parseDateParser(argv['date-parser']),
-      dateStrings: this.#parseDateStrings(argv['date-strings']),
-      defaultSchemas: this.#parseStringArray(argv['default-schema']),
-      dialect: this.#parseDialectName(argv.dialect),
-      domains: this.#parseBoolean(argv.domains),
-      envFile: this.#parseString(argv['env-file']),
-      excludePattern: this.#parseString(argv['exclude-pattern']),
-      includePattern: this.#parseString(argv['include-pattern']),
-      logLevel,
-      numericParser: this.#parseNumericParser(argv['numeric-parser']),
-      outFile: this.#parseString(argv['out-file']),
-      overrides:
-        typeof argv.overrides === 'string'
-          ? JSON.parse(argv.overrides)
-          : undefined,
-      partitions: this.#parseBoolean(argv.partitions),
-      print: this.#parseBoolean(argv.print),
-      runtimeEnums: this.#parseRuntimeEnums(argv['runtime-enums']),
-      singularize: this.#parseBoolean(argv.singularize),
-      typeMapping:
-        typeof argv['type-mapping'] === 'string'
-          ? JSON.parse(argv['type-mapping'])
-          : undefined,
-      typeOnlyImports: this.#parseBoolean(argv['type-only-imports']),
-      url: this.#parseString(argv.url),
-      verify: this.#parseBoolean(argv.verify),
-    });
+    const cliParseResult = configSchema.safeParse(
+      compact({
+        camelCase: this.#parseBoolean(argv['camel-case']),
+        customImports:
+          typeof argv['custom-imports'] === 'string'
+            ? JSON.parse(argv['custom-imports'])
+            : undefined,
+        dateParser: this.#parseDateParser(argv['date-parser']),
+        dateStrings: this.#parseDateStrings(argv['date-strings']),
+        defaultSchemas: this.#parseStringArray(argv['default-schema']),
+        dialect: this.#parseDialectName(argv.dialect),
+        domains: this.#parseBoolean(argv.domains),
+        envFile: this.#parseString(argv['env-file']),
+        excludePattern: this.#parseString(argv['exclude-pattern']),
+        includePattern: this.#parseString(argv['include-pattern']),
+        logLevel,
+        numericParser: this.#parseNumericParser(argv['numeric-parser']),
+        outFile: this.#parseString(argv['out-file']),
+        overrides:
+          typeof argv.overrides === 'string'
+            ? JSON.parse(argv.overrides)
+            : undefined,
+        partitions: this.#parseBoolean(argv.partitions),
+        print: this.#parseBoolean(argv.print),
+        runtimeEnums: this.#parseRuntimeEnums(argv['runtime-enums']),
+        singularize: this.#parseBoolean(argv.singularize),
+        typeMapping:
+          typeof argv['type-mapping'] === 'string'
+            ? JSON.parse(argv['type-mapping'])
+            : undefined,
+        typeOnlyImports: this.#parseBoolean(argv['type-only-imports']),
+        url: this.#parseString(argv.url),
+        verify: this.#parseBoolean(argv.verify),
+      }),
+    );
+    if (!cliParseResult.success) {
+      throw new ConfigError(cliParseResult.error.issues[0]!);
+    }
+
+    const cliOptions = cliParseResult.data;
 
     const print = cliOptions.print ?? configOptions.print;
     const outFile = print

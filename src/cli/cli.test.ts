@@ -528,6 +528,10 @@ describe(Cli.name, () => {
     };
 
     assert(
+      ['--custom-imports=[]'],
+      'Invalid input: expected record, received array',
+    );
+    assert(
       ['--date-parser=bogus'],
       "Parameter '--date-parser' must have one of the following values: string, timestamp",
     );
@@ -552,8 +556,16 @@ describe(Cli.name, () => {
       "Parameter '--numeric-parser' must have one of the following values: number, number-or-string, string",
     );
     assert(
+      ['--overrides=[]'],
+      'Invalid input: expected object, received array',
+    );
+    assert(
       ['--runtime-enums=bogus'],
-      "Parameter '--runtime-enums' must have one of the following values: pascal-case, screaming-snake-case",
+      "Parameter '--runtime-enums' must have one of the following values: true, false, pascal-case, screaming-snake-case",
+    );
+    assert(
+      ['--type-mapping=[]'],
+      'Invalid input: expected record, received array',
     );
   });
 
