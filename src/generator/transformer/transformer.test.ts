@@ -36,12 +36,14 @@ describe(transform.name, () => {
   const transformWithDefaults = ({
     camelCase,
     dateParser,
+    enumCollection = enums,
     numericParser,
     runtimeEnums,
     tables,
   }: {
     camelCase?: boolean;
     dateParser?: DateParser;
+    enumCollection?: EnumCollection;
     numericParser?: NumericParser;
     runtimeEnums?: boolean | RuntimeEnumsStyle;
     tables: TableMetadata[];
@@ -49,7 +51,7 @@ describe(transform.name, () => {
     return transform({
       camelCase,
       dialect: new PostgresDialect({ dateParser, numericParser }),
-      metadata: new DatabaseMetadata({ enums, tables }),
+      metadata: new DatabaseMetadata({ enums: enumCollection, tables }),
       overrides: {
         columns: {
           'table.expression_override': new GenericExpressionNode('Generated', [
@@ -384,6 +386,55 @@ describe(transform.name, () => {
           new IdentifierNode('DB'),
           new ObjectExpressionNode([
             new PropertyNode('table', new TableIdentifierNode('Table')),
+          ]),
+        ),
+      ),
+    ]);
+  });
+
+  it('should prefer schema-qualified Postgres enums over scalar names', () => {
+    const nodes = transformWithDefaults({
+      enumCollection: new EnumCollection({
+        'public.text': ['draft', 'published'],
+      }),
+      tables: [
+        new TableMetadata({
+          columns: [
+            new ColumnMetadata({
+              dataType: 'text',
+              dataTypeSchema: 'public',
+              name: 'status',
+            }),
+          ],
+          name: 'articles',
+          schema: 'public',
+        }),
+      ],
+    });
+
+    deepStrictEqual(nodes, [
+      new ExportStatementNode(
+        new AliasDeclarationNode(
+          'Text',
+          new UnionExpressionNode([
+            new LiteralNode('draft'),
+            new LiteralNode('published'),
+          ]),
+        ),
+      ),
+      new ExportStatementNode(
+        new InterfaceDeclarationNode(
+          new TableIdentifierNode('Articles'),
+          new ObjectExpressionNode([
+            new PropertyNode('status', new IdentifierNode('Text')),
+          ]),
+        ),
+      ),
+      new ExportStatementNode(
+        new InterfaceDeclarationNode(
+          new IdentifierNode('DB'),
+          new ObjectExpressionNode([
+            new PropertyNode('articles', new TableIdentifierNode('Articles')),
           ]),
         ),
       ),

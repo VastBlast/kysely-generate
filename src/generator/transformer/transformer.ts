@@ -740,19 +740,18 @@ const transformColumnToArgs = (
   context: TransformContext,
 ) => {
   const dataType = column.dataType.toLowerCase();
+  const schema = column.dataTypeSchema ?? context.defaultSchemas[0];
+  const dataTypeId = schema ? `${schema}.${dataType}` : dataType;
+  const enumValues = context.enums.get(dataTypeId);
 
   // Check type mapping first:
   const mappedType = getOwn(context.typeMapping, dataType);
 
   if (mappedType) {
-    // Used as a unique identifier for the data type:
-    const schema = column.dataTypeSchema ?? context.defaultSchemas[0];
-    const dataTypeId = schema ? `${schema}.${dataType}` : dataType;
-
     // Only apply mapping if this is a known type in the dialect:
     const isKnownType =
       getOwn(context.scalars, dataType) ||
-      context.enums.has(dataTypeId) ||
+      enumValues !== null ||
       isPostgresRangeType(dataType, context);
 
     if (isKnownType) {
@@ -769,16 +768,6 @@ const transformColumnToArgs = (
     }
   }
 
-  const scalarNode = getOwn(context.scalars, dataType);
-
-  if (scalarNode) {
-    return [scalarNode];
-  }
-
-  // Used as a unique identifier for the data type:
-  const schema = column.dataTypeSchema ?? context.defaultSchemas[0];
-  const dataTypeId = schema ? `${schema}.${dataType}` : dataType;
-
   // Used for serializing the name of the symbol:
   const symbolId =
     column.dataTypeSchema &&
@@ -786,8 +775,6 @@ const transformColumnToArgs = (
     !context.defaultSchemas.includes(column.dataTypeSchema)
       ? `${column.dataTypeSchema}.${dataType}`
       : dataType;
-
-  const enumValues = context.enums.get(dataTypeId);
 
   if (enumValues) {
     if (context.runtimeEnums) {
@@ -806,6 +793,12 @@ const transformColumnToArgs = (
     });
     const node = new IdentifierNode(symbolName);
     return [node];
+  }
+
+  const scalarNode = getOwn(context.scalars, dataType);
+
+  if (scalarNode) {
+    return [scalarNode];
   }
 
   const symbolName = context.symbols.getName(symbolId);
