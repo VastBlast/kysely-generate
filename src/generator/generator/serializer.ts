@@ -233,11 +233,11 @@ export class TypeScriptSerializer implements Serializer {
 
     const identifier = toPascalCase(this.singularize(node.name));
 
-    if (IDENTIFIER_REGEXP.test(identifier)) {
-      return identifier;
+    if (!identifier) {
+      return node.name;
     }
 
-    return /^\d/.test(identifier) ? `_${identifier}` : node.name;
+    return /^\d/.test(identifier) ? `_${identifier}` : identifier;
   }
 
   serializeImportClause(node: ImportClauseNode) {

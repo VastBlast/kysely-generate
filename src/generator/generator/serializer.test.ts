@@ -136,6 +136,12 @@ describe(TypeScriptSerializer.name, () => {
         ),
         '_123',
       );
+      strictEqual(
+        new TypeScriptSerializer({ singularize: true }).serializeIdentifier(
+          new TableIdentifierNode('élèves-items'),
+        ),
+        'ÉlèvesItem',
+      );
 
       for (const name of ['$', '_']) {
         strictEqual(
