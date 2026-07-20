@@ -130,6 +130,21 @@ describe(TypeScriptSerializer.name, () => {
         }).serializeIdentifier(new TableIdentifierNode('Users')),
         'UserModel',
       );
+      strictEqual(
+        new TypeScriptSerializer({ singularize: true }).serializeIdentifier(
+          new TableIdentifierNode('_123s'),
+        ),
+        '_123',
+      );
+
+      for (const name of ['$', '_']) {
+        strictEqual(
+          new TypeScriptSerializer({ singularize: true }).serializeIdentifier(
+            new TableIdentifierNode(name),
+          ),
+          name,
+        );
+      }
     });
   });
 

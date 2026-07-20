@@ -677,6 +677,25 @@ describe(serializeFromMetadata.name, () => {
     );
   });
 
+  test('singularize keeps table identifiers valid', () => {
+    expect(
+      serialize({
+        metadata: {
+          tables: [{ columns: [], name: '123s', schema: 'public' }],
+        },
+        singularize: true,
+      }),
+    ).toStrictEqual(
+      dedent`
+        export interface _123 {}
+
+        export interface DB {
+          "123s": _123;
+        }
+      `,
+    );
+  });
+
   test('customImports', () => {
     expect(
       serialize({

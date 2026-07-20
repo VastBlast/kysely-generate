@@ -227,9 +227,17 @@ export class TypeScriptSerializer implements Serializer {
   }
 
   serializeIdentifier(node: IdentifierNode) {
-    return this.singularize && node.isTableIdentifier
-      ? toPascalCase(this.singularize(node.name))
-      : node.name;
+    if (!this.singularize || !node.isTableIdentifier) {
+      return node.name;
+    }
+
+    const identifier = toPascalCase(this.singularize(node.name));
+
+    if (IDENTIFIER_REGEXP.test(identifier)) {
+      return identifier;
+    }
+
+    return /^\d/.test(identifier) ? `_${identifier}` : node.name;
   }
 
   serializeImportClause(node: ImportClauseNode) {
