@@ -126,8 +126,17 @@ export class ConnectionStringParser {
     const protocol = parts[1]!;
     const tail = parts[2]!;
     const normalizedProtocol = protocol.toLowerCase();
-    const normalizedConnectionString =
-      normalizedProtocol === 'pg' ? `postgres${tail}` : connectionString;
+    let normalizedConnectionString = connectionString;
+
+    if (normalizedProtocol === 'pg') {
+      normalizedConnectionString = `postgres${tail}`;
+    } else if (
+      normalizedProtocol === 'sqlite' &&
+      tail.startsWith('://')
+    ) {
+      normalizedConnectionString = tail.slice(3);
+    }
+
     const dialect = options.dialect ?? this.#inferDialectName(connectionString);
 
     return {

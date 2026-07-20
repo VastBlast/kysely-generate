@@ -168,6 +168,25 @@ describe(ConnectionStringParser.name, () => {
         dialect: 'sqlite',
       });
     });
+
+    it.each([
+      ['sqlite://./path/to/db.sqlite', './path/to/db.sqlite'],
+      ['sqlite:///path/to/db.sqlite', '/path/to/db.sqlite'],
+      ['sqlite://mysql:data.sqlite', 'mysql:data.sqlite'],
+      ['SQLITE://./path/to/db.sqlite', './path/to/db.sqlite'],
+    ])('normalizes %s paths', (connectionString, normalizedConnectionString) => {
+      deepStrictEqual(parser.parse({ connectionString }), {
+        connectionString: normalizedConnectionString,
+        dialect: 'sqlite',
+      });
+    });
+
+    it('does not alter sqlite: paths without double slashes', () => {
+      deepStrictEqual(parser.parse({ connectionString: 'sqlite:db.sqlite' }), {
+        connectionString: 'sqlite:db.sqlite',
+        dialect: 'sqlite',
+      });
+    });
   });
 
   describe('libsql', () => {
