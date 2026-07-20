@@ -12,10 +12,32 @@ import { DatabaseMetadata } from '../../metadata/database-metadata';
 import type { TableMetadata } from '../../metadata/table-metadata';
 import type { PostgresDB } from './postgres-db';
 
+export type PostgresArrayInspector = {
+  arrayType: string;
+  arrayTypeSchema: string;
+  elementType: string;
+  elementTypeSchema: string;
+};
+
 export type PostgresDomainInspector = {
+  arrayType?: string;
   rootType: string;
+  rootTypeSchema?: string;
   typeName: string;
   typeSchema: string;
+};
+
+type PostgresDomainRow = Omit<PostgresDomainInspector, 'arrayType'> & {
+  arrayType: string | null;
+};
+
+type PostgresTypeReference = {
+  dataType: string;
+  dataTypeSchema?: string;
+};
+
+const getTypeKey = (dataType: string, dataTypeSchema?: string) => {
+  return `${dataTypeSchema ?? ''}\0${dataType}`;
 };
 
 export type TableReference = {
@@ -174,31 +196,31 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
   }
 
   createDatabaseMetadata({
+    arrays,
     domains,
     enums,
     partitions,
     tables: rawTables,
   }: {
+    arrays?: PostgresArrayInspector[];
     domains: PostgresDomainInspector[];
     enums: EnumCollection;
     partitions: TableReference[];
     tables: KyselyTableMetadata[];
   }) {
+    const resolveType = this.createTypeResolver(domains, arrays);
     const tables = rawTables
       .map((table): TableMetadata => {
         const columns = table.columns.map((column): ColumnMetadata => {
-          const dataType = this.getRootType(column, domains);
+          const { dataType, dataTypeSchema, isArray } = resolveType(column);
           const schema =
-            column.dataTypeSchema ?? this.options.defaultSchemas?.[0] ?? 'public';
-          const enumValues = enums.get(
-            `${schema}.${dataType}`,
-          );
-          const isArray = dataType.startsWith('_');
+            dataTypeSchema ?? this.options.defaultSchemas?.[0] ?? 'public';
+          const enumValues = enums.get(`${schema}.${dataType}`);
 
           return {
             comment: column.comment ?? null,
-            dataType: isArray ? dataType.slice(1) : dataType,
-            dataTypeSchema: column.dataTypeSchema,
+            dataType,
+            dataTypeSchema,
             enumValues,
             hasDefaultValue: column.hasDefaultValue,
             isArray,
@@ -233,25 +255,124 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
     column: KyselyColumnMetaData,
     domains: PostgresDomainInspector[],
   ) {
-    const foundDomain = domains.find((domain) => {
-      return (
-        domain.typeName === column.dataType &&
-        domain.typeSchema === column.dataTypeSchema
+    const { dataType, isArray } = this.createTypeResolver(domains)(column);
+    return isArray ? `_${dataType}` : dataType;
+  }
+
+  private createTypeResolver(
+    domains: PostgresDomainInspector[],
+    arrays?: PostgresArrayInspector[],
+  ) {
+    const arrayElements = new Map<string, PostgresTypeReference>();
+    const domainRoots = new Map<string, PostgresTypeReference>();
+
+    for (const domain of domains) {
+      domainRoots.set(getTypeKey(domain.typeName, domain.typeSchema), {
+        dataType: domain.rootType,
+        dataTypeSchema: domain.rootTypeSchema ?? domain.typeSchema,
+      });
+
+      if (domain.arrayType) {
+        arrayElements.set(getTypeKey(domain.arrayType, domain.typeSchema), {
+          dataType: domain.typeName,
+          dataTypeSchema: domain.typeSchema,
+        });
+      }
+    }
+
+    for (const array of arrays ?? []) {
+      arrayElements.set(
+        getTypeKey(array.arrayType, array.arrayTypeSchema),
+        {
+          dataType: array.elementType,
+          dataTypeSchema: array.elementTypeSchema,
+        },
       );
-    });
-    return foundDomain?.rootType ?? column.dataType;
+    }
+
+    return (column: KyselyColumnMetaData) => {
+      let dataType = column.dataType;
+      let dataTypeSchema = column.dataTypeSchema;
+      let isArray = false;
+      const visitedTypes = new Set<string>();
+
+      while (true) {
+        const key = getTypeKey(dataType, dataTypeSchema);
+        if (visitedTypes.has(key)) {
+          break;
+        }
+        visitedTypes.add(key);
+
+        const domainRoot = domainRoots.get(key);
+        if (domainRoot) {
+          dataType = domainRoot.dataType;
+          dataTypeSchema = domainRoot.dataTypeSchema;
+          continue;
+        }
+
+        const arrayElement = arrayElements.get(key);
+        if (arrayElement) {
+          dataType = arrayElement.dataType;
+          dataTypeSchema = arrayElement.dataTypeSchema;
+          isArray = true;
+          continue;
+        }
+
+        if (arrays === undefined && dataType.startsWith('_')) {
+          dataType = dataType.slice(1);
+          isArray = true;
+          const elementKey = getTypeKey(dataType, dataTypeSchema);
+          if (
+            domainRoots.has(elementKey) ||
+            arrayElements.has(elementKey)
+          ) {
+            continue;
+          }
+        }
+
+        break;
+      }
+
+      return { dataType, dataTypeSchema, isArray };
+    };
   }
 
   async introspect(options: IntrospectOptions<PostgresDB>) {
     const tables = await this.getTables(options);
 
-    const [domains, enums, partitions] = await Promise.all([
+    const [arrays, domains, enums, partitions] = await Promise.all([
+      this.introspectArrays(options.db),
       this.introspectDomains(options.db),
       this.introspectEnums(options.db),
       this.introspectPartitions(options.db),
     ]);
 
-    return this.createDatabaseMetadata({ enums, domains, partitions, tables });
+    return this.createDatabaseMetadata({
+      arrays,
+      domains,
+      enums,
+      partitions,
+      tables,
+    });
+  }
+
+  protected async introspectArrays(db: Kysely<PostgresDB>) {
+    const result = await sql<PostgresArrayInspector>`
+      select
+        array_type.typname as "arrayType",
+        array_namespace.nspname as "arrayTypeSchema",
+        element_type.typname as "elementType",
+        element_namespace.nspname as "elementTypeSchema"
+      from pg_catalog.pg_type as element_type
+      join pg_catalog.pg_type as array_type
+        on array_type.oid = element_type.typarray
+      join pg_catalog.pg_namespace as array_namespace
+        on array_namespace.oid = array_type.typnamespace
+      join pg_catalog.pg_namespace as element_namespace
+        on element_namespace.oid = element_type.typnamespace;
+    `.execute(db);
+
+    return result.rows;
   }
 
   async introspectDomains(db: Kysely<PostgresDB>) {
@@ -259,10 +380,10 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
       return [];
     }
 
-    const result = await sql<PostgresDomainInspector>`
+    const result = await sql<PostgresDomainRow>`
       with recursive domain_hierarchy as (
         select oid, typbasetype
-        from pg_type
+        from pg_catalog.pg_type
         where typtype = 'd'
         and 'information_schema'::regnamespace::oid <> typnamespace
 
@@ -270,20 +391,29 @@ export class PostgresIntrospector extends Introspector<PostgresDB> {
 
         select dh.oid, t.typbasetype
         from domain_hierarchy as dh
-        join pg_type as t ON t.oid = dh.typbasetype
+        join pg_catalog.pg_type as t on t.oid = dh.typbasetype
       )
 
       select
+        array_type.typname as "arrayType",
         t.typname as "typeName",
-        t.typnamespace::regnamespace::text as "typeSchema",
-        bt.typname as "rootType"
+        type_namespace.nspname as "typeSchema",
+        bt.typname as "rootType",
+        root_type_namespace.nspname as "rootTypeSchema"
       from domain_hierarchy as dh
-      join pg_type as t on dh.oid = t.oid
-      join pg_type as bt on dh.typbasetype = bt.oid
+      join pg_catalog.pg_type as t on dh.oid = t.oid
+      join pg_catalog.pg_namespace as type_namespace
+        on type_namespace.oid = t.typnamespace
+      left join pg_catalog.pg_type as array_type on array_type.oid = t.typarray
+      join pg_catalog.pg_type as bt on dh.typbasetype = bt.oid
+      join pg_catalog.pg_namespace as root_type_namespace
+        on root_type_namespace.oid = bt.typnamespace
       where bt.typbasetype = 0;
     `.execute(db);
 
-    return result.rows;
+    return result.rows.map(({ arrayType, ...domain }) => {
+      return arrayType === null ? domain : { ...domain, arrayType };
+    });
   }
 
   async introspectEnums(db: Kysely<PostgresDB>) {

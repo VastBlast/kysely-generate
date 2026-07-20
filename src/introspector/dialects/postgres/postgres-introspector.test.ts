@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { PostgresIntrospector } from './postgres-introspector';
+import { EnumCollection } from '../../enum-collection';
+import {
+  type PostgresArrayInspector,
+  type PostgresDomainInspector,
+  PostgresIntrospector,
+} from './postgres-introspector';
 
 type RawColumn = {
   auto_incrementing: string | null;
@@ -48,7 +53,232 @@ const column = ({
   ...overrides,
 });
 
+type TypeColumn = {
+  dataType: string;
+  dataTypeSchema: string;
+  name: string;
+};
+
+const array = (
+  arrayType: string,
+  elementType: string,
+  arrayTypeSchema = 'public',
+  elementTypeSchema = arrayTypeSchema,
+): PostgresArrayInspector => ({
+  arrayType,
+  arrayTypeSchema,
+  elementType,
+  elementTypeSchema,
+});
+
+const typeColumn = (
+  dataType: string,
+  name: string,
+  dataTypeSchema = 'public',
+): TypeColumn => ({ dataType, dataTypeSchema, name });
+
+const inspectTypes = ({
+  arrays,
+  columns,
+  domains = [],
+  enums = new EnumCollection(),
+}: {
+  arrays?: PostgresArrayInspector[];
+  columns: TypeColumn[];
+  domains?: PostgresDomainInspector[];
+  enums?: EnumCollection;
+}) => {
+  const metadata = new PostgresIntrospector().createDatabaseMetadata({
+    arrays,
+    domains,
+    enums,
+    partitions: [],
+    tables: [
+      {
+        columns: columns.map((column) => ({
+          ...column,
+          hasDefaultValue: false,
+          isAutoIncrementing: false,
+          isNullable: false,
+        })),
+        isView: false,
+        name: 'users',
+        schema: 'public',
+      },
+    ],
+  });
+
+  return metadata.tables[0]!.columns;
+};
+
 describe(PostgresIntrospector.name, () => {
+  test('resolves catalog arrays without guessing from underscores', () => {
+    const columns = inspectTypes({
+      arrays: [
+        array('__status', '_status'),
+        array('status_array', 'status'),
+      ],
+      columns: [
+        typeColumn('_status', 'status'),
+        typeColumn('__status', 'statuses'),
+        typeColumn('status_array', 'renamed_statuses'),
+      ],
+      enums: new EnumCollection({
+        'public._status': ['leading'],
+        'public.status': ['active', 'inactive'],
+      }),
+    });
+
+    expect(columns).toMatchObject([
+      { dataType: '_status', enumValues: ['leading'], isArray: false },
+      { dataType: '_status', enumValues: ['leading'], isArray: true },
+      {
+        dataType: 'status',
+        enumValues: ['active', 'inactive'],
+        isArray: true,
+      },
+    ]);
+  });
+
+  test('uses the root type schema for domains', () => {
+    const columns = inspectTypes({
+      arrays: [],
+      columns: [typeColumn('_status_domain', 'status', 'domain_schema')],
+      domains: [
+        {
+          rootType: 'status',
+          rootTypeSchema: 'enum_schema',
+          typeName: '_status_domain',
+          typeSchema: 'domain_schema',
+        },
+      ],
+      enums: new EnumCollection({
+        'enum_schema.status': ['active', 'inactive'],
+      }),
+    });
+
+    expect(columns[0]).toMatchObject({
+      dataType: 'status',
+      dataTypeSchema: 'enum_schema',
+      enumValues: ['active', 'inactive'],
+      isArray: false,
+    });
+  });
+
+  test('resolves arrays of domains and domains over arrays', () => {
+    const columns = inspectTypes({
+      arrays: [
+        array('status_domain_array', 'status_domain', 'domain_schema'),
+        array('status_array', 'status', 'enum_schema'),
+      ],
+      columns: [
+        typeColumn(
+          'status_domain_array',
+          'array_of_domains',
+          'domain_schema',
+        ),
+        typeColumn(
+          'status_array_domain',
+          'domain_over_array',
+          'domain_schema',
+        ),
+      ],
+      domains: [
+        {
+          rootType: 'status',
+          rootTypeSchema: 'enum_schema',
+          typeName: 'status_domain',
+          typeSchema: 'domain_schema',
+        },
+        {
+          rootType: 'status_array',
+          rootTypeSchema: 'enum_schema',
+          typeName: 'status_array_domain',
+          typeSchema: 'domain_schema',
+        },
+      ],
+      enums: new EnumCollection({
+        'enum_schema.status': ['active', 'inactive'],
+      }),
+    });
+
+    expect(columns).toMatchObject([
+      {
+        dataType: 'status',
+        dataTypeSchema: 'enum_schema',
+        enumValues: ['active', 'inactive'],
+        isArray: true,
+      },
+      {
+        dataType: 'status',
+        dataTypeSchema: 'enum_schema',
+        enumValues: ['active', 'inactive'],
+        isArray: true,
+      },
+    ]);
+  });
+
+  test('keeps array relationships isolated by schema', () => {
+    const columns = inspectTypes({
+      arrays: [
+        array('values', 'text', 'first', 'pg_catalog'),
+        array('values', 'int4', 'second', 'pg_catalog'),
+      ],
+      columns: [
+        typeColumn('values', 'texts', 'first'),
+        typeColumn('values', 'numbers', 'second'),
+      ],
+    });
+
+    expect(columns).toMatchObject([
+      {
+        dataType: 'text',
+        dataTypeSchema: 'pg_catalog',
+        isArray: true,
+      },
+      {
+        dataType: 'int4',
+        dataTypeSchema: 'pg_catalog',
+        isArray: true,
+      },
+    ]);
+  });
+
+  test('preserves the legacy array fallback without catalog data', () => {
+    const columns = inspectTypes({
+      columns: [
+        typeColumn('__status', 'statuses'),
+        typeColumn('status_domain_array', 'domain_statuses'),
+      ],
+      domains: [
+        {
+          arrayType: 'status_domain_array',
+          rootType: 'status',
+          rootTypeSchema: 'public',
+          typeName: 'status_domain',
+          typeSchema: 'public',
+        },
+      ],
+      enums: new EnumCollection({
+        'public._status': ['leading'],
+        'public.status': ['active'],
+      }),
+    });
+
+    expect(columns).toMatchObject([
+      {
+        dataType: '_status',
+        enumValues: ['leading'],
+        isArray: true,
+      },
+      {
+        dataType: 'status',
+        enumValues: ['active'],
+        isArray: true,
+      },
+    ]);
+  });
+
   test('keeps upstream table order when there are no materialized views', () => {
     const introspector = new PostgresIntrospector();
     const tables = [
