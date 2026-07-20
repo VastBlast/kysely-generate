@@ -254,6 +254,16 @@ describe(TypeScriptSerializer.name, () => {
       ),
       '"bar baz": BarBaz;\n',
     );
+    strictEqual(
+      serializer.serializeProperty(
+        new PropertyNode(
+          'documented',
+          new IdentifierNode('string'),
+          'safe */ comment',
+        ),
+      ),
+      '/**\n   * safe *\\/ comment\n   */\n  documented: string;\n',
+    );
   });
 
   describe(TypeScriptSerializer.prototype.serializeRuntimeEnum.name, () => {

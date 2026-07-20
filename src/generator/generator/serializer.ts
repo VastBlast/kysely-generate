@@ -339,7 +339,7 @@ export class TypeScriptSerializer implements Serializer {
     if (node.comment) {
       data += '/**\n';
 
-      for (const line of node.comment.split(/\r?\n/)) {
+      for (const line of node.comment.replaceAll('*/', '*\\/').split(/\r?\n/)) {
         data += `   *${line ? ` ${line}` : ''}\n`;
       }
 
