@@ -239,6 +239,7 @@ describe(generate.name, () => {
         ...generateOptions,
         db,
         dialect,
+        outFile: null,
       });
       const expectedOutput = await readFile(
         join(SNAPSHOTS_DIR, `${name}.snapshot.ts`),
@@ -258,6 +259,7 @@ describe(generate.name, () => {
         ...generateOptions,
         db,
         dialect,
+        outFile: null,
       });
       await addExtraColumn(db);
 

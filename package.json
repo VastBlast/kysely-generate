@@ -5,7 +5,7 @@
   "author": "VastBlast",
   "license": "MIT",
   "bin": {
-    "kysely-generate": "./dist/cli/bin.mjs"
+    "kysely-generate": "./dist/cli/bin.js"
   },
   "repository": {
     "type": "git",
@@ -126,16 +126,20 @@
     "node": ">=20.0.0"
   },
   "main": "./dist/index.cjs",
-  "module": "./dist/index.mjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
+      "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
     "./cli/bin": {
-      "import": "./dist/cli/bin.mjs",
+      "import": "./dist/cli/bin.js",
       "require": "./dist/cli/bin.cjs"
+    },
+    "./db": {
+      "import": "./dist/db.js",
+      "require": "./dist/db.cjs"
     },
     "./package.json": "./package.json"
   },

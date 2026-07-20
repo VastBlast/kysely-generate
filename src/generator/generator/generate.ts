@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import { parse, relative, resolve, sep } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import type { DatabaseMetadata } from '../../introspector';
-import { DEFAULT_OUT_FILE } from '../constants';
+import { DEFAULT_CJS_OUT_FILE, DEFAULT_OUT_FILE } from '../constants';
 import type { GeneratorDialect } from '../dialect';
 import type { Logger } from '../logger/logger';
 import { type Overrides } from '../transformer/transformer';
@@ -62,21 +62,33 @@ export const generate = async (options: GenerateOptions) => {
 
   const newOutput = serializeFromMetadata({ ...options, metadata, startTime });
 
+  const configuredOutFile = options.outFile;
+  const isDefaultOutFile = configuredOutFile === undefined;
   const outFile =
-    options.outFile === undefined
+    configuredOutFile === undefined
       ? DEFAULT_OUT_FILE
-      : options.outFile === null
+      : configuredOutFile === null
         ? null
-        : resolve(process.cwd(), options.outFile);
+        : resolve(process.cwd(), configuredOutFile);
 
   if (options.print) {
     console.info();
     console.info(newOutput);
   } else if (outFile) {
+    const outputFiles =
+      isDefaultOutFile
+        ? [DEFAULT_OUT_FILE, DEFAULT_CJS_OUT_FILE]
+        : [outFile];
+
     if (options.verify) {
-      const oldOutput = await fs.readFile(outFile, 'utf8');
       const diffChecker = new DiffChecker();
-      const diff = diffChecker.diff(oldOutput, newOutput);
+      let diff: string | undefined;
+
+      for (const outputFile of outputFiles) {
+        const oldOutput = await fs.readFile(outputFile, 'utf8');
+        diff = diffChecker.diff(oldOutput, newOutput);
+        if (diff) break;
+      }
 
       if (diff) {
         options.logger?.error(diff);
@@ -95,7 +107,9 @@ export const generate = async (options: GenerateOptions) => {
       const outDir = parse(outFile).dir;
 
       await fs.mkdir(outDir, { recursive: true });
-      await fs.writeFile(outFile, newOutput);
+      await Promise.all(
+        outputFiles.map((outputFile) => fs.writeFile(outputFile, newOutput)),
+      );
 
       const endTime = performance.now();
       const duration = Math.round(endTime - startTime);
