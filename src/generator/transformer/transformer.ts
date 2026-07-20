@@ -132,6 +132,8 @@ const collectSymbol = (name: string, context: TransformContext) => {
 
 const extractIdentifiersFromTypeExpression = (expression: string) => {
   const identifiers = new Set<string>();
+  const identifierRegexp =
+    /[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*/uy;
   let i = 0;
   let inLineComment = false;
   let inBlockComment = false;
@@ -140,26 +142,11 @@ const extractIdentifiersFromTypeExpression = (expression: string) => {
   let inTemplateLiteral = false;
   let templateExpressionDepth = 0;
   let memberStart = false;
+  let qualifiedMemberIndex: number | undefined;
 
-  const isIdentifierStart = (char: string | undefined) => {
-    if (!char) {
-      return false;
-    }
-
-    return (
-      (char >= 'A' && char <= 'Z') ||
-      (char >= 'a' && char <= 'z') ||
-      char === '_' ||
-      char === '$'
-    );
-  };
-
-  const isIdentifierPart = (char: string | undefined) => {
-    if (!char) {
-      return false;
-    }
-
-    return isIdentifierStart(char) || (char >= '0' && char <= '9');
+  const readIdentifier = (startIndex: number) => {
+    identifierRegexp.lastIndex = startIndex;
+    return identifierRegexp.exec(expression)?.[0];
   };
 
   const isWhitespace = (char: string | undefined) =>
@@ -230,20 +217,28 @@ const extractIdentifiersFromTypeExpression = (expression: string) => {
   const peekNextIdentifier = (startIndex: number) => {
     const nextChar = peekNextNonTriviaChar(startIndex);
 
-    if (!nextChar || !isIdentifierStart(nextChar.char)) {
-      return null;
-    }
-
-    let end = nextChar.index + 1;
-
-    while (end < expression.length && isIdentifierPart(expression[end]!)) {
-      end += 1;
-    }
-
-    return expression.slice(nextChar.index, end);
+    return nextChar ? readIdentifier(nextChar.index) : undefined;
   };
 
-  const isMemberModifier = (identifier: string) => identifier === 'readonly';
+  const isMemberModifier = (
+    identifier: string,
+    identifierEndIndex: number,
+  ) => {
+    if (identifier === 'readonly') {
+      return true;
+    }
+
+    if (identifier !== 'get' && identifier !== 'set') {
+      return false;
+    }
+
+    const memberNameIndex = skipTrivia(identifierEndIndex);
+    const memberName = readIdentifier(memberNameIndex);
+    return (
+      memberName !== undefined &&
+      peekNextNonTriviaChar(memberNameIndex + memberName.length)?.char === '('
+    );
+  };
 
   const isMemberName = (identifierEndIndex: number) => {
     if (!memberStart) {
@@ -258,10 +253,10 @@ const extractIdentifiersFromTypeExpression = (expression: string) => {
 
     if (nextChar.char === '?') {
       const afterQuestion = peekNextNonTriviaChar(nextChar.index + 1);
-      return afterQuestion?.char === ':';
+      return afterQuestion?.char === ':' || afterQuestion?.char === '(';
     }
 
-    if (nextChar.char === ':') {
+    if (nextChar.char === ':' || nextChar.char === '(') {
       return true;
     }
 
@@ -412,26 +407,33 @@ const extractIdentifiersFromTypeExpression = (expression: string) => {
       }
     }
 
-    if (isIdentifierStart(char)) {
-      let end = i + 1;
+    const identifier = readIdentifier(i);
+    if (identifier) {
+      const end = i + identifier.length;
+      const isQualifiedMember = i === qualifiedMemberIndex;
 
-      while (end < expression.length && isIdentifierPart(expression[end]!)) {
-        end += 1;
-      }
-
-      const identifier = expression.slice(i, end);
-
-      if (memberStart && isMemberModifier(identifier)) {
+      if (memberStart && isMemberModifier(identifier, end)) {
         i = end;
         continue;
       }
 
-      if (!isMemberName(end)) {
+      if (!isQualifiedMember && !isMemberName(end)) {
         identifiers.add(identifier);
       }
 
+      qualifiedMemberIndex = undefined;
       memberStart = false;
       i = end;
+      continue;
+    }
+
+    if (char === '.' && expression[i - 1] !== '.' && nextChar !== '.') {
+      const nextMember = peekNextNonTriviaChar(i + 1);
+      qualifiedMemberIndex =
+        nextMember && readIdentifier(nextMember.index)
+          ? nextMember.index
+          : undefined;
+      i += 1;
       continue;
     }
 
@@ -477,6 +479,7 @@ const collectSymbols = (
       collectSymbols(node.values, context);
       break;
     case 'ExtendsClause':
+      collectSymbols(node.checkType, context);
       collectSymbols(node.extendsType, context);
       collectSymbols(node.trueType, context);
       collectSymbols(node.falseType, context);

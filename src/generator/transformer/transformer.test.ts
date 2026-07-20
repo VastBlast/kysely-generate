@@ -7,6 +7,7 @@ import { DatabaseMetadata } from '../../introspector/metadata/database-metadata'
 import { TableMetadata } from '../../introspector/metadata/table-metadata';
 import { AliasDeclarationNode } from '../ast/alias-declaration-node';
 import { ArrayExpressionNode } from '../ast/array-expression-node';
+import { ExtendsClauseNode } from '../ast/extends-clause-node';
 import { ExportStatementNode } from '../ast/export-statement-node';
 import { GenericExpressionNode } from '../ast/generic-expression-node';
 import { IdentifierNode, TableIdentifierNode } from '../ast/identifier-node';
@@ -546,6 +547,43 @@ describe(transform.name, () => {
     );
   });
 
+  it('should collect custom imports from conditional check types', () => {
+    const nodes = transform({
+      customImports: { ExternalType: './types' },
+      dialect: new PostgresDialect({}),
+      metadata: new DatabaseMetadata({
+        tables: [
+          new TableMetadata({
+            columns: [new ColumnMetadata({ dataType: 'text', name: 'value' })],
+            name: 'table',
+            schema: 'public',
+          }),
+        ],
+      }),
+      overrides: {
+        columns: {
+          'table.value': new ExtendsClauseNode(
+            new IdentifierNode('ExternalType'),
+            new IdentifierNode('unknown'),
+            new IdentifierNode('string'),
+            new IdentifierNode('never'),
+          ),
+        },
+      },
+    });
+
+    const customImport = nodes.find(
+      (node) =>
+        node.type === 'ImportStatement' && node.moduleName === './types',
+    );
+    deepStrictEqual(
+      customImport,
+      new ImportStatementNode('./types', [
+        new ImportClauseNode('ExternalType'),
+      ]),
+    );
+  });
+
   it('should support named imports with # syntax', () => {
     const nodes = transform({
       customImports: {
@@ -634,6 +672,10 @@ describe(transform.name, () => {
         JSONColumnType: 'kysely',
         OtherType: './types',
         TemplateType: './types',
+        VariadicType: './types',
+        Élève: './types',
+        東京Type: './types',
+        𐐀Type: './types',
       },
       dialect: new PostgresDialect({}),
       metadata: new DatabaseMetadata({
@@ -654,7 +696,7 @@ describe(transform.name, () => {
       overrides: {
         columns: {
           'table.payload':
-            'JSONColumnType<Record<string, CustomType | OtherType[]> | `prefix-${TemplateType}`>',
+            'JSONColumnType<Record<string, CustomType | OtherType[]> | `prefix-${TemplateType}` | [...VariadicType[]] | Élève | 東京Type | 𐐀Type>',
         },
       },
     });
@@ -666,7 +708,15 @@ describe(transform.name, () => {
 
     deepStrictEqual(
       typesImport?.imports.map((clause) => clause.name).sort(),
-      ['CustomType', 'OtherType', 'TemplateType'].sort(),
+      [
+        'CustomType',
+        'OtherType',
+        'TemplateType',
+        'VariadicType',
+        'Élève',
+        '東京Type',
+        '𐐀Type',
+      ].sort(),
     );
 
     const kyselyImport = importNodes.find(
@@ -680,6 +730,45 @@ describe(transform.name, () => {
     );
   });
 
+  it('should ignore qualified member names in raw overrides', () => {
+    const nodes = transform({
+      customImports: {
+        Instant: './types',
+        Temporal: '@js-temporal/polyfill',
+      },
+      dialect: new PostgresDialect({}),
+      metadata: new DatabaseMetadata({
+        enums,
+        tables: [
+          new TableMetadata({
+            columns: [
+              new ColumnMetadata({
+                dataType: 'text',
+                name: 'created_at',
+              }),
+            ],
+            name: 'events',
+            schema: 'public',
+          }),
+        ],
+      }),
+      overrides: {
+        columns: {
+          'events.created_at':
+            'Temporal /* qualifier */ . /* member */ Instant',
+        },
+      },
+    });
+
+    const importNodes = nodes.filter((node) => node.type === 'ImportStatement');
+
+    deepStrictEqual(importNodes, [
+      new ImportStatementNode('@js-temporal/polyfill', [
+        new ImportClauseNode('Temporal'),
+      ]),
+    ]);
+  });
+
   it('should ignore property and parameter names in raw overrides', () => {
     const nodes = transform({
       customImports: {
@@ -688,6 +777,11 @@ describe(transform.name, () => {
         bar: './types',
         baz: './types',
         foo: './types',
+        get: './types',
+        load: './types',
+        save: './types',
+        set: './types',
+        value: './types',
       },
       dialect: new PostgresDialect({}),
       metadata: new DatabaseMetadata({
@@ -708,7 +802,7 @@ describe(transform.name, () => {
       overrides: {
         columns: {
           'table.details':
-            '({ foo: CustomType; readonly bar?: OtherType } & ((baz: CustomType) => OtherType))',
+            '({ foo: CustomType; readonly bar?: OtherType; save(value: CustomType): OtherType; load?(): OtherType; get value(): CustomType; set value(input: OtherType) } & ((baz: CustomType) => OtherType))',
         },
       },
     });
