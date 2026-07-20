@@ -33,7 +33,10 @@ export class Cli {
     const logger = options.logger ?? new Logger(options.logLevel);
 
     logger.debug('Options:');
-    logger.debug(options);
+    logger.debug({
+      ...options,
+      ...(options.url === undefined ? {} : { url: '[REDACTED]' }),
+    });
     logger.debug();
 
     const { connectionString, dialect: dialectName } =
