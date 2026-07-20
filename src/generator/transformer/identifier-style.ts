@@ -1,1 +1,4 @@
-export type IdentifierStyle = 'kysely-pascal-case' | 'screaming-snake-case';
+export type IdentifierStyle =
+  | 'kysely-pascal-case'
+  | 'pascal-case'
+  | 'screaming-snake-case';

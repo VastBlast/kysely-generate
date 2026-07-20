@@ -19,8 +19,10 @@ import type { RuntimeEnumDeclarationNode } from '../ast/runtime-enum-declaration
 import type { StatementNode } from '../ast/statement-node';
 import type { UnionExpressionNode } from '../ast/union-expression-node';
 import type { GeneratorDialect } from '../dialect';
+import type { SymbolEntry } from '../transformer/symbol-collection';
+import { SymbolCollection } from '../transformer/symbol-collection';
 import { transform, type Overrides } from '../transformer/transformer';
-import { toPascalCase, toScreamingSnakeCase } from '../utils/case-converter';
+import { toPascalCase } from '../utils/case-converter';
 import type { RuntimeEnumsStyle } from './runtime-enums-style';
 import { createSingularizer } from './singularizer';
 
@@ -364,21 +366,28 @@ export class TypeScriptSerializer implements Serializer {
     data += node.id.name;
     data += ' {\n';
 
-    const members = [...node.members].sort(([a], [b]) => {
-      return a.localeCompare(b);
+    const members = new SymbolCollection({
+      entries: node.members.map(
+        ([name, value]): SymbolEntry => [
+          name,
+          { node: value, type: 'RuntimeEnumMember' },
+        ],
+      ),
+      identifierStyle:
+        this.runtimeEnums === 'pascal-case'
+          ? 'pascal-case'
+          : 'screaming-snake-case',
     });
 
-    for (const member of members) {
-      data += '  ';
-
-      if (this.runtimeEnums === 'pascal-case') {
-        data += toPascalCase(member[0]);
-      } else {
-        data += toScreamingSnakeCase(member[0]);
+    for (const { name, symbol } of members.entries()) {
+      if (symbol.type !== 'RuntimeEnumMember') {
+        continue;
       }
 
+      data += '  ';
+      data += name;
       data += ' = ';
-      data += this.serializeLiteral(member[1]);
+      data += this.serializeLiteral(symbol.node);
       data += ',';
       data += '\n';
     }

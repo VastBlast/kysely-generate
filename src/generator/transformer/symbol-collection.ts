@@ -5,6 +5,7 @@ import type { RuntimeEnumDeclarationNode } from '../ast/runtime-enum-declaration
 import type { TemplateNode } from '../ast/template-node';
 import {
   toKyselyPascalCase,
+  toPascalCase,
   toScreamingSnakeCase,
 } from '../utils/case-converter';
 import type { IdentifierStyle } from './identifier-style';
@@ -28,6 +29,17 @@ export type SymbolType =
   | 'RuntimeEnumDefinition'
   | 'RuntimeEnumMember'
   | 'Table';
+
+const convertIdentifier = (identifier: string, style: IdentifierStyle) => {
+  switch (style) {
+    case 'kysely-pascal-case':
+      return toKyselyPascalCase(identifier);
+    case 'pascal-case':
+      return toPascalCase(identifier);
+    case 'screaming-snake-case':
+      return toScreamingSnakeCase(identifier);
+  }
+};
 
 export class SymbolCollection {
   readonly identifierStyle: IdentifierStyle;
@@ -78,11 +90,18 @@ export class SymbolCollection {
     }
 
     const symbolNames = new Set(Object.values(this.symbolNames));
-    const caseConverter =
-      this.identifierStyle === 'screaming-snake-case'
-        ? toScreamingSnakeCase
-        : toKyselyPascalCase;
-    symbolName = caseConverter(id.replaceAll(/[^\w$]/g, '_'));
+    symbolName = convertIdentifier(
+      id.replaceAll(/[^\w$]/g, '_'),
+      this.identifierStyle,
+    );
+
+    if (!symbolName) {
+      symbolName = '_';
+    }
+
+    if (/^\d/.test(symbolName)) {
+      symbolName = `_${symbolName}`;
+    }
 
     if (symbolNames.has(symbolName)) {
       let suffix = 2;
@@ -92,10 +111,6 @@ export class SymbolCollection {
       }
 
       symbolName += suffix;
-    }
-
-    if (/^\d/.test(symbolName)) {
-      symbolName = `_${symbolName}`;
     }
 
     this.symbols[id] = symbol;

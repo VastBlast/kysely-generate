@@ -784,12 +784,7 @@ const transformColumnToArgs = (
   if (enumValues) {
     if (context.runtimeEnums) {
       const symbol: SymbolNode = {
-        node: new RuntimeEnumDeclarationNode(symbolId, enumValues, {
-          identifierStyle:
-            context.runtimeEnums === 'screaming-snake-case'
-              ? 'screaming-snake-case'
-              : 'kysely-pascal-case',
-        }),
+        node: new RuntimeEnumDeclarationNode(symbolId, enumValues),
         type: 'RuntimeEnumDefinition',
       };
       symbol.node.id.name = context.symbols.set(symbolId, symbol);

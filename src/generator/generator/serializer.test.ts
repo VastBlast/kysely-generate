@@ -274,16 +274,16 @@ describe(TypeScriptSerializer.name, () => {
 
       strictEqual(
         enumSerializer.serializeRuntimeEnum(
-          new RuntimeEnumDeclarationNode('Mood', [
-            'sad',
-            'happy',
-            'happy_or_sad',
-          ]),
+          new RuntimeEnumDeclarationNode(
+            'Mood',
+            ['SAD', 'HAPPY', 'HAPPY_OR_SAD'],
+            { identifierStyle: 'kysely-pascal-case' },
+          ),
         ),
         'enum Mood {\n' +
-          '  Happy = "happy",\n' +
-          '  HappyOrSad = "happy_or_sad",\n' +
-          '  Sad = "sad",\n' +
+          '  Happy = "HAPPY",\n' +
+          '  HappyOrSad = "HAPPY_OR_SAD",\n' +
+          '  Sad = "SAD",\n' +
           '}',
       );
     });
@@ -293,16 +293,36 @@ describe(TypeScriptSerializer.name, () => {
 
       strictEqual(
         enumSerializer.serializeRuntimeEnum(
-          new RuntimeEnumDeclarationNode('Mood', [
-            'sad',
-            'happy',
-            'happy_or_sad',
-          ]),
+          new RuntimeEnumDeclarationNode(
+            'Mood',
+            ['sad', 'happy', 'happy_or_sad'],
+          ),
         ),
         'enum Mood {\n' +
           '  HAPPY = "happy",\n' +
           '  HAPPY_OR_SAD = "happy_or_sad",\n' +
           '  SAD = "sad",\n' +
+          '}',
+      );
+    });
+
+    it('should generate valid unique member names', () => {
+      const declaration = new RuntimeEnumDeclarationNode(
+        'Unusual',
+        ['', '_1', '!', '?', '1'],
+      );
+      const output = new TypeScriptSerializer({
+        runtimeEnums: 'screaming-snake-case',
+      }).serializeRuntimeEnum(declaration);
+
+      strictEqual(
+        output,
+        'enum Unusual {\n' +
+          '  _ = "",\n' +
+          '  _1 = "_1",\n' +
+          '  _2 = "!",\n' +
+          '  _3 = "?",\n' +
+          '  _12 = "1",\n' +
           '}',
       );
     });
