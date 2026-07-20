@@ -91,8 +91,15 @@ const POSTGRES_RANGE_TYPES = new Set([
   'tstzrange',
 ]);
 
+const getOwn = <T>(
+  record: Record<string, T | undefined> | undefined,
+  key: string,
+) => {
+  return record && Object.hasOwn(record, key) ? record[key] : undefined;
+};
+
 const collectSymbol = (name: string, context: TransformContext) => {
-  const definition = context.definitions[name];
+  const definition = getOwn(context.definitions, name);
   if (definition) {
     if (context.symbols.has(name)) {
       return;
@@ -103,7 +110,7 @@ const collectSymbol = (name: string, context: TransformContext) => {
     return;
   }
 
-  const moduleReference = context.imports[name];
+  const moduleReference = getOwn(context.imports, name);
   if (moduleReference) {
     if (context.symbols.has(name)) {
       return;
@@ -509,7 +516,7 @@ const collectSymbols = (
 
 const createContext = (options: TransformOptions): TransformContext => {
   const customImports = options.customImports || {};
-  const customImportNodes: Imports = {};
+  const customImportNodes: Imports = Object.create(null);
 
   // Convert custom imports to `ModuleReferenceNode` instances:
   for (const [name, moduleSpec] of Object.entries(customImports)) {
@@ -613,7 +620,8 @@ const createDefinitionNodes = (context: TransformContext) => {
 };
 
 const createImportNodes = (context: TransformContext) => {
-  const imports: Record<string, ImportClauseNode[] | undefined> = {};
+  const imports: Record<string, ImportClauseNode[] | undefined> =
+    Object.create(null);
   const importNodes: ImportStatementNode[] = [];
 
   for (const { id, name, symbol } of context.symbols.entries()) {
@@ -734,7 +742,7 @@ const transformColumnToArgs = (
   const dataType = column.dataType.toLowerCase();
 
   // Check type mapping first:
-  const mappedType = context.typeMapping?.[dataType];
+  const mappedType = getOwn(context.typeMapping, dataType);
 
   if (mappedType) {
     // Used as a unique identifier for the data type:
@@ -743,7 +751,7 @@ const transformColumnToArgs = (
 
     // Only apply mapping if this is a known type in the dialect:
     const isKnownType =
-      context.scalars[dataType] ||
+      getOwn(context.scalars, dataType) ||
       context.enums.has(dataTypeId) ||
       isPostgresRangeType(dataType, context);
 
@@ -761,7 +769,7 @@ const transformColumnToArgs = (
     }
   }
 
-  const scalarNode = context.scalars[dataType];
+  const scalarNode = getOwn(context.scalars, dataType);
 
   if (scalarNode) {
     return [scalarNode];

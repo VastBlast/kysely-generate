@@ -358,6 +358,32 @@ describe(serializeFromMetadata.name, () => {
     );
   });
 
+  test('prototype-named tables and data types', () => {
+    expect(
+      serialize({
+        metadata: {
+          tables: [
+            {
+              columns: [{ dataType: 'constructor', name: 'value' }],
+              name: 'constructor',
+            },
+          ],
+        },
+        typeMapping: { text: 'string' },
+      }),
+    ).toStrictEqual(
+      dedent`
+        export interface Constructor {
+          value: string;
+        }
+
+        export interface DB {
+          constructor: Constructor;
+        }
+      `,
+    );
+  });
+
   test('defaultSchemas', () => {
     expect(
       serialize({

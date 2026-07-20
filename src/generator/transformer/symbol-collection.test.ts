@@ -1,4 +1,4 @@
-import { deepStrictEqual } from 'node:assert';
+import { deepStrictEqual, strictEqual } from 'node:assert';
 import { IdentifierNode } from '../ast/identifier-node';
 import type { SymbolNode } from './symbol-collection';
 import { SymbolCollection } from './symbol-collection';
@@ -30,4 +30,12 @@ test(SymbolCollection.name, () => {
     '!': '_',
     '"': '_2',
   });
+
+  for (const id of ['constructor', 'toString', '__proto__']) {
+    const name = symbols.set(id, symbol);
+
+    strictEqual(symbols.get(id), symbol);
+    strictEqual(symbols.getName(id), name);
+    strictEqual(symbols.has(id), true);
+  }
 });

@@ -71,26 +71,28 @@ export class SymbolCollection {
   }
 
   get(id: string) {
-    return this.symbols[id];
+    return Object.hasOwn(this.symbols, id) ? this.symbols[id] : undefined;
   }
 
   getName(id: string) {
-    return this.symbolNames[id];
+    return Object.hasOwn(this.symbolNames, id)
+      ? this.symbolNames[id]
+      : undefined;
   }
 
   has(id: string) {
-    return this.symbols[id] !== undefined;
+    return this.get(id) !== undefined;
   }
 
   set(id: string, symbol: SymbolNode) {
-    let symbolName = this.symbolNames[id];
+    const existingName = this.getName(id);
 
-    if (symbolName) {
-      return symbolName;
+    if (existingName) {
+      return existingName;
     }
 
     const symbolNames = new Set(Object.values(this.symbolNames));
-    symbolName = convertIdentifier(
+    let symbolName = convertIdentifier(
       id.replaceAll(/[^\w$]/g, '_'),
       this.identifierStyle,
     );
@@ -113,8 +115,18 @@ export class SymbolCollection {
       symbolName += suffix;
     }
 
-    this.symbols[id] = symbol;
-    this.symbolNames[id] = symbolName;
+    Object.defineProperty(this.symbols, id, {
+      configurable: true,
+      enumerable: true,
+      value: symbol,
+      writable: true,
+    });
+    Object.defineProperty(this.symbolNames, id, {
+      configurable: true,
+      enumerable: true,
+      value: symbolName,
+      writable: true,
+    });
 
     return symbolName;
   }
