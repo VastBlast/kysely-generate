@@ -1,9 +1,32 @@
 import { deepStrictEqual } from 'node:assert';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ConnectionStringParser } from './connection-string-parser';
-import { describe, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 describe(ConnectionStringParser.name, () => {
   const parser = new ConnectionStringParser();
+
+  it('should load environment files without writing directly to the console', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kysely-generate-'));
+    const envFile = join(directory, '.env');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await writeFile(envFile, 'KYSELY_GENERATE_TEST_URL=:memory:\n');
+      parser.parse({
+        connectionString: 'env(KYSELY_GENERATE_TEST_URL)',
+        envFile,
+      });
+
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+      delete process.env.KYSELY_GENERATE_TEST_URL;
+      await rm(directory, { recursive: true });
+    }
+  });
 
   describe('postgres', () => {
     it('should infer the correct dialect name', () => {

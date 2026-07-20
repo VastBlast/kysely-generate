@@ -80,7 +80,9 @@ export class ConnectionStringParser {
         );
       }
 
-      const { error } = expandEnv(loadEnv({ path: options.envFile }));
+      const { error } = expandEnv(
+        loadEnv({ path: options.envFile, quiet: true }),
+      );
       const displayEnvFile = options.envFile ?? '.env';
 
       if (error) {
